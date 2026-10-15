@@ -98,6 +98,12 @@ void RaphaeliAccel::stop(IOService *provider)
 {
     if (gAccel == this)
         gAccel = nullptr;
+    /* completeForIO/release the stamp page getStampMemory prepared and left retained */
+    if (fStamps) {
+        fStamps->complete();
+        fStamps->release();
+        fStamps = nullptr;
+    }
     IOGraphicsAccelerator2::stop(provider);
 }
 

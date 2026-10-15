@@ -87,7 +87,9 @@ class RaphaeliFB : public IOFramebuffer {
     static void vblFire(thread_call_param_t p0, thread_call_param_t) {
         RaphaeliFB *me = (RaphaeliFB *)p0;
         if (me->fStopping) return;
-        if (me->fVbl.proc) me->fVbl.proc(me->fVbl.target, me->fVbl.ref);
+        /* no registered callback = unregistered: stay stopped until registerForInterruptType re-arms us */
+        if (me->fVbl.proc == nullptr) return;
+        me->fVbl.proc(me->fVbl.target, me->fVbl.ref);
         uint64_t period;
         nanoseconds_to_absolutetime(me->fFrameNs, &period);
         uint64_t now = mach_absolute_time();
@@ -118,9 +120,14 @@ public:
         IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
         uint64_t bar0_phys, bar0_size;
         int bar0_io;
+        /* only on a GPU the Raphaeli driver has claimed (nmx_kext.cpp sets nmxgpu-claimed after nmx_port_attach);
+           without this the personality would bind an unclaimed device whenever the PCI ID happens to match */
+        if (pci == nullptr || pci->getProperty("nmxgpu-claimed") != kOSBooleanTrue) {
+            FBLOG("GPU not claimed by the Raphaeli driver - not starting");
+            return false;
+        }
         /* the same gate as Raphaeli::start(): without a usable MMIO BAR0 there is nothing to display on */
-        if (pci == nullptr
-            || nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 1
+        if (nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 1
             || bar0_size == 0 || bar0_io) {
             FBLOG("no usable MMIO BAR0; this display stays with the firmware framebuffer");
             return false;
@@ -259,11 +266,30 @@ public:
     IOItemCount getConnectionCount() override { return 1; }
     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref,
                                       void **iref) override {
-        if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
+        if (type == kIOFBVBLInterruptType) {
+            fVbl = { proc, target, ref };
+            if (iref) *iref = &fVbl;
+            /* re-arm the timer a previous unregisterInterrupt cancelled */
+            if (fVblTimer && !fStopping) {
+                uint64_t d;
+                clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d);
+                fVblNext = d;
+                thread_call_enter_delayed(fVblTimer, d);
+            }
+            return kIOReturnSuccess;
+        }
         if (type == kIOFBConnectInterruptType) { fConnect = { proc, target, ref }; if (iref) *iref = &fConnect; return kIOReturnSuccess; }
         return kIOReturnUnsupported;
     }
-    IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+    IOReturn unregisterInterrupt(void *src) override {
+        /* actually drop the registration: cancel the pending VBL tick and return to the no-callback state */
+        if (src == nullptr || src == &fVbl) {
+            fVbl = {};
+            if (fVblTimer) thread_call_cancel(fVblTimer);
+        }
+        if (src == nullptr || src == &fConnect) fConnect = {};
+        return kIOReturnSuccess;
+    }
     IOReturn setInterruptState(void *, UInt32) override { return kIOReturnSuccess; }
     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { return kIOReturnSuccess; }
     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnSuccess; }

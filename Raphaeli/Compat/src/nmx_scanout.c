@@ -66,6 +66,8 @@ kern_return_t nmx_scanout_alloc(size_t size, vm_offset_t *phys_addr,
     vm_offset_t pa = nmx_kva_to_phys(wb);
     void *wc = pmap_mapdev_attr(pa, len, VM_MEMATTR_WRITE_COMBINING);
     if (wc == NULL || pa == 0) {
+        if (wc != NULL)
+            pmap_unmapdev(wc, len);   /* the mapping succeeded even though the pa check failed */
         kmem_free(wb, len);
         return KERN_NO_SPACE;
     }
