@@ -1,29 +1,29 @@
 warning: ignoring -fapple-kext which is valid for C++ and Objective-C++ only
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:27:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:5:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:27:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:5:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:113:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/time.h:45:9: warning: 'getmicrotime' macro redefined [-Wmacro-redefined]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/time.h:45:9: warning: 'getmicrotime' macro redefined [-Wmacro-redefined]
    45 | #define getmicrotime(tv) nmx_microtime(tv)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/time.h:202:9: note: previous definition is here
   202 | #define getmicrotime(a)         microtime(a)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:27:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:30:9: warning: 'MAXCOMLEN' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:27:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:30:9: warning: 'MAXCOMLEN' macro redefined [-Wmacro-redefined]
    30 | #define MAXCOMLEN 19
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:95:9: note: previous definition is here
    95 | #define MAXCOMLEN       16              /* max command name remembered */
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/proc.h:76:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/lock.h:76:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/locks.h:36:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/machine/locks.h:32:
@@ -34,16 +34,16 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/vm_param.h:111:9: warning: 'atop' macro redefined [-Wmacro-redefined]
   111 | #define atop(x) ((vm_address_t)(x) >> PAGE_SHIFT)
       |         ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:27:9: note: previous definition is here
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:27:9: note: previous definition is here
    27 | #define atop(x) ((uintptr_t)(x) >> PAGE_SHIFT)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/proc.h:76:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/lock.h:76:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/locks.h:36:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/machine/locks.h:32:
@@ -54,16 +54,16 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/vm_param.h:112:9: warning: 'ptoa' macro redefined [-Wmacro-redefined]
   112 | #define ptoa(x) ((vm_address_t)(x) << PAGE_SHIFT)
       |         ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:28:9: note: previous definition is here
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:28:9: note: previous definition is here
    28 | #define ptoa(x) ((uintptr_t)(x) << PAGE_SHIFT)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/proc.h:76:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/lock.h:76:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/locks.h:36:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/machine/locks.h:32:
@@ -74,16 +74,16 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/vm_param.h:144:9: warning: 'round_page' macro redefined [-Wmacro-redefined]
   144 | #define round_page(x) (((vm_offset_t)(x) + PAGE_MASK) & ~((vm_offset_t)PAGE_MASK))
       |         ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:26:9: note: previous definition is here
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:26:9: note: previous definition is here
    26 | #define round_page(x) (((uintptr_t)(x) + PAGE_MASK) & ~(uintptr_t)PAGE_MASK)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:8:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/proc.h:76:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/lock.h:12:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/lock.h:76:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/locks.h:36:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/machine/locks.h:32:
@@ -94,758 +94,758 @@ In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOS
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/vm_param.h:145:9: warning: 'trunc_page' macro redefined [-Wmacro-redefined]
   145 | #define trunc_page(x) ((vm_offset_t)(x) & ~((vm_offset_t)PAGE_MASK))
       |         ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/param.h:25:9: note: previous definition is here
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/param.h:25:9: note: previous definition is here
    25 | #define trunc_page(x) ((uintptr_t)(x) & ~(uintptr_t)PAGE_MASK)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:19:9: warning: 'PSWP' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:19:9: warning: 'PSWP' macro redefined [-Wmacro-redefined]
    19 | #define PSWP (PRI_MIN_KERN + 0)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:125:9: note: previous definition is here
   125 | #define PSWP    0
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:20:9: warning: 'PVM' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:20:9: warning: 'PVM' macro redefined [-Wmacro-redefined]
    20 | #define PVM (PRI_MIN_KERN + 4)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:126:9: note: previous definition is here
   126 | #define PVM     4
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:21:9: warning: 'PINOD' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:21:9: warning: 'PINOD' macro redefined [-Wmacro-redefined]
    21 | #define PINOD (PRI_MIN_KERN + 8)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:127:9: note: previous definition is here
   127 | #define PINOD   8
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:22:9: warning: 'PRIBIO' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:22:9: warning: 'PRIBIO' macro redefined [-Wmacro-redefined]
    22 | #define PRIBIO (PRI_MIN_KERN + 12)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:128:9: note: previous definition is here
   128 | #define PRIBIO  16
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:23:9: warning: 'PVFS' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:23:9: warning: 'PVFS' macro redefined [-Wmacro-redefined]
    23 | #define PVFS (PRI_MIN_KERN + 16)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:129:9: note: previous definition is here
   129 | #define PVFS    20
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:24:9: warning: 'PZERO' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:24:9: warning: 'PZERO' macro redefined [-Wmacro-redefined]
    24 | #define PZERO (PRI_MIN_KERN + 20)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:130:9: note: previous definition is here
   130 | #define PZERO   22              /* No longer magic, shouldn't be here.  XXX */
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:25:9: warning: 'PSOCK' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:25:9: warning: 'PSOCK' macro redefined [-Wmacro-redefined]
    25 | #define PSOCK (PRI_MIN_KERN + 24)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:131:9: note: previous definition is here
   131 | #define PSOCK   24
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:26:9: warning: 'PWAIT' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:26:9: warning: 'PWAIT' macro redefined [-Wmacro-redefined]
    26 | #define PWAIT (PRI_MIN_KERN + 28)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:132:9: note: previous definition is here
   132 | #define PWAIT   32
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:27:9: warning: 'PLOCK' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:27:9: warning: 'PLOCK' macro redefined [-Wmacro-redefined]
    27 | #define PLOCK (PRI_MIN_KERN + 32)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:133:9: note: previous definition is here
   133 | #define PLOCK   36
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:28:9: warning: 'PPAUSE' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:28:9: warning: 'PPAUSE' macro redefined [-Wmacro-redefined]
    28 | #define PPAUSE (PRI_MIN_KERN + 36)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:134:9: note: previous definition is here
   134 | #define PPAUSE  40
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:31:9: warning: 'PUSER' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:31:9: warning: 'PUSER' macro redefined [-Wmacro-redefined]
    31 | #define PUSER PRI_MIN_TIMESHARE
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:135:9: note: previous definition is here
   135 | #define PUSER   50
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:35:9: warning: 'PDROP' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:10:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/priority.h:35:9: warning: 'PDROP' macro redefined [-Wmacro-redefined]
    35 | #define PDROP 0x200
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/param.h:141:9: note: previous definition is here
   141 | #define PDROP   0x400           /* OR'd with pri to stop re-aquistion of mutex upon wakeup */
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:106:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:12:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/pcpu.h:4:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/proc.h:12:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/pcpu.h:4:
 In file included from /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/thread.h:98:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/vm/vm_kern.h:3:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/vm/vm_extern.h:4:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/vm/vm.h:31:9: warning: 'VM_PROT_COPY' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/vm/vm_kern.h:3:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/vm/vm_extern.h:4:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/vm/vm.h:31:9: warning: 'VM_PROT_COPY' macro redefined [-Wmacro-redefined]
    31 | #define VM_PROT_COPY 0x08
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/vm_prot.h:121:9: note: previous definition is here
   121 | #define VM_PROT_COPY            ((vm_prot_t) 0x10)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:7:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/systm.h:116:9: warning: 'MALLOC_DEFINE' macro redefined [-Wmacro-redefined]
   116 | #define MALLOC_DEFINE(a, b, c)
       |         ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:37:9: note: previous definition is here
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:37:9: note: previous definition is here
    37 | #define MALLOC_DEFINE(type, shortdesc, longdesc) NMX_MALLOC_DEFINE(type, shortdesc, longdesc)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:28:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:43:73: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:28:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:43:73: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
    43 | static __inline int ilog2_int(int n) { return (int)(8 * sizeof(n) - 1 - __builtin_clz((unsigned)n)); }
       |                                                                       ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:44:75: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:44:75: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
    44 | static __inline int ilog2_long(long n) { return (int)(8 * sizeof(n) - 1 - __builtin_clzl((unsigned long)n)); }
       |                                                                         ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:45:85: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/libkern.h:45:85: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
    45 | static __inline int ilog2_long_long(long long n) { return (int)(8 * sizeof(n) - 1 - __builtin_clzll((unsigned long long)n)); }
       |                                                                                   ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:30:9: warning: 'DELAY' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:30:9: warning: 'DELAY' macro redefined [-Wmacro-redefined]
    30 | #define DELAY(usec) IODelay(usec)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/i386/param.h:166:9: note: previous definition is here
   166 | #define DELAY(n) delay(n)
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:45:9: warning: 'copyin' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:45:9: warning: 'copyin' macro redefined [-Wmacro-redefined]
    45 | #define copyin(u, k, l) (copyin)((user_addr_t)(uintptr_t)(u), (k), (l))
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/libkern/copyio.h:60:9: note: previous definition is here
    60 | #define copyin(uaddr, kaddr, len) __copyin_chk(uaddr, kaddr, len, __builtin_object_size(kaddr, 0))
       |         ^
 In file included from <built-in>:1:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:46:9: warning: 'copyout' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_prelude.h:28:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/systm.h:46:9: warning: 'copyout' macro redefined [-Wmacro-redefined]
    46 | #define copyout(k, u, l) (copyout)((k), (user_addr_t)(uintptr_t)(u), (l))
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/libkern/copyio.h:61:9: note: previous definition is here
    61 | #define copyout(kaddr, uaddr, len) __copyout_chk(kaddr, uaddr, len, __builtin_object_size(kaddr, 0))
       |         ^
 In file included from <built-in>:2:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:34:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:28:89: warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:34:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:28:89: warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    28 | static inline void be16enc(void *p, uint16_t v) { uint8_t *b = p; b[0] = v >> 8; b[1] = v; }
       |                                                                                       ~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:92: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:92: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    29 | static inline void be32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v >> 24; b[1] = v >> 16; b[2] = v >> 8; b[3] = v; }
       |                                                                                        ~ ~~^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:108: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:108: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    29 | static inline void be32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v >> 24; b[1] = v >> 16; b[2] = v >> 8; b[3] = v; }
       |                                                                                                        ~ ~~^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:121: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:29:121: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    29 | static inline void be32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v >> 24; b[1] = v >> 16; b[2] = v >> 8; b[3] = v; }
       |                                                                                                                       ~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:31:74: warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:31:74: warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    31 | static inline void le16enc(void *p, uint16_t v) { uint8_t *b = p; b[0] = v; b[1] = v >> 8; }
       |                                                                        ~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:74: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:74: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    32 | static inline void le32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v; b[1] = v >> 8; b[2] = v >> 16; b[3] = v >> 24; }
       |                                                                        ~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:86: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:86: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    32 | static inline void le32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v; b[1] = v >> 8; b[2] = v >> 16; b[3] = v >> 24; }
       |                                                                                  ~ ~~^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:101: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/endian.h:32:101: warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    32 | static inline void le32enc(void *p, uint32_t v) { uint8_t *b = p; b[0] = v; b[1] = v >> 8; b[2] = v >> 16; b[3] = v >> 24; }
       |                                                                                                 ~ ~~^~~~~
 In file included from <built-in>:2:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler_types.h:17:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler_attributes.h:46:9: warning: '__weak' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler_types.h:17:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler_attributes.h:46:9: warning: '__weak' macro redefined [-Wmacro-redefined]
    46 | #define __weak __weak_symbol
       |         ^
 <built-in>:414:9: note: previous definition is here
   414 | #define __weak __attribute__((objc_gc(weak)))
       |         ^
 In file included from <built-in>:2:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:49:9: warning: '__counted_by' macro redefined [-Wmacro-redefined]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:49:9: warning: '__counted_by' macro redefined [-Wmacro-redefined]
    49 | #define __counted_by(_x)                __attribute__((__counted_by__(_x)))
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/cdefs.h:952:9: note: previous definition is here
   952 | #define __counted_by(N)
       |         ^
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/gfp.h:36:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/page.h:63:46: warning: implicit conversion changes signedness: 'int' to 'pgprot_t' (aka 'unsigned long') [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/gfp.h:36:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/page.h:63:46: warning: implicit conversion changes signedness: 'int' to 'pgprot_t' (aka 'unsigned long') [-Wsign-conversion]
    63 |         return ((attr << LINUXKPI_CACHE_MODE_SHIFT) | LINUXKPI_PROT_VALID);
       |         ~~~~~~  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/page.h:70:16: warning: implicit conversion loses integer precision: 'pgprot_t' (aka 'unsigned long') to 'vm_memattr_t' (aka 'char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/page.h:70:16: warning: implicit conversion loses integer precision: 'pgprot_t' (aka 'unsigned long') to 'vm_memattr_t' (aka 'char') [-Wimplicit-int-conversion]
    70 |                 return (prot >> LINUXKPI_CACHE_MODE_SHIFT);
       |                 ~~~~~~  ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/gfp.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/topology.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/topology.h:44:10: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/gfp.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/topology.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/topology.h:44:10: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    44 |         return (mp_ncores);
       |         ~~~~~~  ^~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/topology.h:50:10: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/topology.h:50:10: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    50 |         return (mp_ncpus);
       |         ~~~~~~  ^~~~~~~~
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:43:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/err.h:74:10: warning: implicit conversion loses integer precision: 'long' to 'int' [-Wshorten-64-to-32]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:43:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/err.h:74:10: warning: implicit conversion loses integer precision: 'long' to 'int' [-Wshorten-64-to-32]
    74 |                 return PTR_ERR(ptr);
       |                 ~~~~~~ ^~~~~~~~~~~~
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:37:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:135:12: warning: implicit conversion changes signedness: 'int' to 'gfp_t' (aka 'unsigned int') [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:37:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:135:12: warning: implicit conversion changes signedness: 'int' to 'gfp_t' (aka 'unsigned int') [-Wsign-conversion]
   135 |                 flags &= ~M_WAITOK;
       |                       ~~ ^~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:242:34: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:242:34: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   242 |         return (malloc(size, M_KMALLOC, linux_check_m_flags(flags)));
       |                 ~~~~~~                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:249:37: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/slab.h:249:37: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   248 |         return (malloc_domainset(size, M_KMALLOC,
       |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   249 |             linux_get_vm_domain_set(node), linux_check_m_flags(flags)));
       |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:56:73: note: expanded from macro 'malloc_domainset'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:56:73: note: expanded from macro 'malloc_domainset'
    56 | #define malloc_domainset(size, type, ds, flags) malloc((size), (type), (flags))
       |                                                 ~~~~~~                  ^~~~~
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:38:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/uaccess.h:94:46: warning: operand of ? changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:38:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/uaccess.h:94:46: warning: operand of ? changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    94 |         return (copyout_nofault(from, to, n) != 0 ? n : 0);
       |         ~~~~~~                                      ^
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:40:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:76:14: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:40:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:76:14: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    76 |         return (ffs(mask) - 1);
       |                 ~~~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:82:14: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:82:14: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    82 |         return (fls(mask) - 1);
       |                 ~~~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:94:22: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:94:22: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
    94 |         return (ffsll(mask) - 1);
       |         ~~~~~~  ~~~~~~~~~~~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:137:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:137:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   137 |                 return (bit + __ffsl(*addr));
       |                 ~~~~~~  ~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:137:24: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:137:24: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
   137 |                 return (bit + __ffsl(*addr));
       |                               ~~~~~~ ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:140:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:140:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   140 |                 mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
       |                      ~ ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:146:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:146:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   146 |         return (bit);
       |         ~~~~~~  ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:159:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:159:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   159 |                 return (bit + __ffsl(~(*addr)));
       |                 ~~~~~~  ~~~~^~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:159:24: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:159:24: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   159 |                 return (bit + __ffsl(~(*addr)));
       |                               ~~~~~~ ^~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:162:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:162:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   162 |                 mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
       |                      ~ ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:168:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:168:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   168 |         return (bit);
       |         ~~~~~~  ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:184:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:184:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   184 |                 mask = (*addr) & BITMAP_LAST_WORD_MASK(offs);
       |                      ~ ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:186:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:186:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   186 |                         return (bit + __flsl(mask));
       |                         ~~~~~~  ~~~~^~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:192:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:192:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   192 |                         return (bit + __flsl(*addr));
       |                         ~~~~~~  ~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:192:25: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:192:25: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
   192 |                         return (bit + __flsl(*addr));
       |                                       ~~~~~~ ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:179:13: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:179:13: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
   179 |         pos = size / BITS_PER_LONG;
       |             ~ ~~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:212:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:212:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   212 |                 mask = (*addr) & ~BITMAP_LAST_WORD_MASK(offs);
       |                      ~ ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:214:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:214:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   214 |                         return (bit + __ffsl(mask));
       |                         ~~~~~~  ~~~~^~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:215:14: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:215:14: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   215 |                 if (size - bit <= BITS_PER_LONG)
       |                          ~ ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:220:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:220:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   220 |         for (size -= bit; size >= BITS_PER_LONG;
       |                   ~~ ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:224:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:224:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   224 |                 return (bit + __ffsl(*addr));
       |                 ~~~~~~  ~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:224:24: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:224:24: warning: implicit conversion changes signedness: 'const unsigned long' to 'long' [-Wsign-conversion]
   224 |                 return (bit + __ffsl(*addr));
       |                               ~~~~~~ ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:227:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:227:18: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   227 |                 mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
       |                      ~ ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:233:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:233:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   233 |         return (bit);
       |         ~~~~~~  ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:207:15: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:207:15: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
   207 |         pos = offset / BITS_PER_LONG;
       |             ~ ~~~~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:252:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:252:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   252 |                 mask = ~(*addr) & ~BITMAP_LAST_WORD_MASK(offs);
       |                      ~ ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:254:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:254:16: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   254 |                         return (bit + __ffsl(mask));
       |                         ~~~~~~  ~~~~^~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:255:14: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:255:14: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   255 |                 if (size - bit <= BITS_PER_LONG)
       |                          ~ ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:260:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:260:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   260 |         for (size -= bit; size >= BITS_PER_LONG;
       |                   ~~ ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:264:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:264:15: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   264 |                 return (bit + __ffsl(~(*addr)));
       |                 ~~~~~~  ~~~~^~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:264:24: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:264:24: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   264 |                 return (bit + __ffsl(~(*addr)));
       |                               ~~~~~~ ^~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:267:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:267:19: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   267 |                 mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
       |                      ~ ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:273:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:273:10: warning: implicit conversion changes signedness: 'int' to 'unsigned long' [-Wsign-conversion]
   273 |         return (bit);
       |         ~~~~~~  ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:247:15: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:247:15: warning: implicit conversion loses integer precision: 'unsigned long' to 'int' [-Wshorten-64-to-32]
   247 |         pos = offset / BITS_PER_LONG;
       |             ~ ~~~~~~~^~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:310:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:310:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   310 |         bit = (1UL << bit);
       |             ~  ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:312:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:312:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
   312 |         val = *var;
       |             ~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:313:45: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:313:45: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
   313 |         while (!atomic_fcmpset_long(var, &val, val & ~bit))
       |                 ~~~~~~~~~~~~~~~~~~~            ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:325:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:325:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   325 |         bit = (1UL << bit);
       |             ~  ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:327:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:327:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
   327 |         val = *var;
       |             ~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:328:10: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:328:10: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
   328 |         *var &= ~bit;
       |              ~~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:340:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:340:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   340 |         bit = (1UL << bit);
       |             ~  ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:342:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:342:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
   342 |         val = *var;
       |             ~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:343:45: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:343:45: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
   343 |         while (!atomic_fcmpset_long(var, &val, val | bit))
       |                 ~~~~~~~~~~~~~~~~~~~            ~~~~^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:355:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:355:13: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
   355 |         bit = (1UL << bit);
       |             ~  ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:357:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:357:8: warning: implicit conversion changes signedness: 'volatile unsigned long' to 'long' [-Wsign-conversion]
   357 |         val = *var;
       |             ~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:358:10: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:358:10: warning: implicit conversion changes signedness: 'long' to 'unsigned long' [-Wsign-conversion]
   358 |         *var |= bit;
       |              ~~ ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:427:21: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:427:21: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
   427 |         uint8_t shift = 63 - index;
       |                 ~~~~~   ~~~^~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:429:36: warning: implicit conversion changes signedness: 'int64_t' (aka 'long long') to 'uint64_t' (aka 'unsigned long long') [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:429:36: warning: implicit conversion changes signedness: 'int64_t' (aka 'long long') to 'uint64_t' (aka 'unsigned long long') [-Wsign-conversion]
   429 |         return ((int64_t)(value << shift) >> shift);
       |         ~~~~~~  ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:435:21: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:435:21: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
   435 |         uint8_t shift = 31 - index;
       |                 ~~~~~   ~~~^~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:437:36: warning: implicit conversion changes signedness: 'int32_t' (aka 'int') to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/bitops.h:437:36: warning: implicit conversion changes signedness: 'int32_t' (aka 'int') to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
   437 |         return ((int32_t)(value << shift) >> shift);
       |         ~~~~~~  ~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~
 In file included from <built-in>:4:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:163:34: warning: implicit conversion changes signedness: 'long' to 'size_t' (aka 'unsigned long') [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/nmxkpi_post.h:45:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:163:34: warning: implicit conversion changes signedness: 'long' to 'size_t' (aka 'unsigned long') [-Wsign-conversion]
   163 |         return (memdup_user_nul(ustr, n - 1));
       |                 ~~~~~~~~~~~~~~~       ~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:233:7: warning: implicit conversion loses integer precision: 'int' to 'u8' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/string.h:233:7: warning: implicit conversion loses integer precision: 'int' to 'u8' (aka 'unsigned char') [-Wimplicit-int-conversion]
   233 |         ch = c;
       |            ~ ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:45:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/build_bug.h:62:9: warning: 'static_assert' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:45:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/build_bug.h:62:9: warning: 'static_assert' macro redefined [-Wmacro-redefined]
    62 | #define static_assert(x, ...)           __static_assert(x, ##__VA_ARGS__, #x)
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/kern/assert.h:267:11: note: previous definition is here
   267 |                 #define static_assert(...) _STATIC_ASSERT_OVERLOADED_MACRO(__VA_ARGS__, _static_assert_2_args, _static_assert_1_arg)(__VA_ARGS__)
       |                         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:48:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:47:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/uaccess.h:38:10: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:48:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:47:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/uaccess.h:38:10: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
    38 |                 return n;
       |                 ~~~~~~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/uaccess.h:47:10: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/uaccess.h:47:10: warning: implicit conversion changes signedness: 'unsigned long' to 'long' [-Wsign-conversion]
    47 |                 return n;
       |                 ~~~~~~ ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:48:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:52:28: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:48:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:52:28: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    52 |         return (strtouq(cp, endp, base));
       |                 ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:58:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:58:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    58 |         return (strtoq(cp, endp, base));
       |                 ~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:64:28: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:64:28: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    64 |         return (strtoul(cp, endp, base));
       |                 ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:70:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:70:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    70 |         return (strtol(cp, endp, base));
       |                 ~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:79:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:79:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    79 |         temp = strtoul(cp, &end, base);
       |                ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:97:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:97:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    97 |         temp = strtol(cp, &end, base);
       |                ~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:115:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:115:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   115 |         temp = strtol(cp, &end, base);
       |                ~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:135:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:135:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   135 |         temp = strtoul(cp, &end, base);
       |                ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:155:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:155:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   155 |         temp = strtoul(cp, &end, base);
       |                ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:175:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:175:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   175 |         temp = strtoul(cp, &end, base);
       |                ~~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:207:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:207:26: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   207 |         temp = strtoq(cp, &end, base);
       |                ~~~~~~           ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:231:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kstrtox.h:231:27: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   231 |         temp = strtouq(cp, &end, base);
       |                ~~~~~~~           ^~~~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:39:9: warning: 'ETIME' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:39:9: warning: 'ETIME' macro redefined [-Wmacro-redefined]
    39 | #define ETIME           ETIMEDOUT
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/errno.h:227:9: note: previous definition is here
   227 | #define ETIME           101             /* STREAM ioctl timeout */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:41:9: warning: 'ENODATA' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:41:9: warning: 'ENODATA' macro redefined [-Wmacro-redefined]
    41 | #define ENODATA         ECONNREFUSED
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/errno.h:222:9: note: previous definition is here
   222 | #define ENODATA         96              /* No message available on STREAM */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:69:9: warning: 'ENOSR' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:53:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/errno.h:69:9: warning: 'ENOSR' macro redefined [-Wmacro-redefined]
    69 | #define ENOSR           533
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/sys/errno.h:224:9: note: previous definition is here
   224 | #define ENOSR           98              /* No STREAM resources */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:31:9: warning: 'NSEC_PER_USEC' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:31:9: warning: 'NSEC_PER_USEC' macro redefined [-Wmacro-redefined]
    31 | #define NSEC_PER_USEC   1000L
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/clock_types.h:84:9: note: previous definition is here
    84 | #define NSEC_PER_USEC   1000ull         /* nanoseconds per microsecond */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:32:9: warning: 'NSEC_PER_MSEC' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:32:9: warning: 'NSEC_PER_MSEC' macro redefined [-Wmacro-redefined]
    32 | #define NSEC_PER_MSEC   1000000L
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/clock_types.h:87:9: note: previous definition is here
    87 | #define NSEC_PER_MSEC   1000000ull      /* nanoseconds per millisecond */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:33:9: warning: 'NSEC_PER_SEC' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:33:9: warning: 'NSEC_PER_SEC' macro redefined [-Wmacro-redefined]
    33 | #define NSEC_PER_SEC    1000000000L
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/clock_types.h:86:9: note: previous definition is here
    86 | #define NSEC_PER_SEC    1000000000ull   /* nanoseconds per second */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:36:9: warning: 'USEC_PER_SEC' macro redefined [-Wmacro-redefined]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:36:9: warning: 'USEC_PER_SEC' macro redefined [-Wmacro-redefined]
    36 | #define USEC_PER_SEC    1000000L
       |         ^
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/Kernel.framework/Headers/mach/clock_types.h:85:9: note: previous definition is here
    85 | #define USEC_PER_SEC    1000000ull      /* microseconds per second */
       |         ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:43:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/math64.h:146:10: warning: implicit conversion changes signedness: 'int' to 'uint64_t' (aka 'unsigned long long') [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:43:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/math64.h:146:10: warning: implicit conversion changes signedness: 'int' to 'uint64_t' (aka 'unsigned long long') [-Wsign-conversion]
   146 |                         x1 &= ~1;
       |                            ~~ ^~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:65:19: warning: implicit conversion loses integer precision: 'long' to '__darwin_suseconds_t' (aka 'int') [-Wshorten-64-to-32]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:33:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:65:19: warning: implicit conversion loses integer precision: 'long' to '__darwin_suseconds_t' (aka 'int') [-Wshorten-64-to-32]
    65 |         tv.tv_usec = rem / 1000;
       |                    ~ ~~~~^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:138:9: warning: implicit conversion changes signedness: 'time_t' (aka 'long') to 'unsigned long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/time.h:138:9: warning: implicit conversion changes signedness: 'time_t' (aka 'long') to 'unsigned long' [-Wsign-conversion]
   138 |         return time_uptime;
       |         ~~~~~~ ^~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/time.h:48:21: note: expanded from macro 'time_uptime'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/time.h:48:21: note: expanded from macro 'time_uptime'
    48 | #define time_uptime nmx_time_uptime()
       |                     ^~~~~~~~~~~~~~~~~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:128:27: warning: implicit conversion changes signedness: 'int' to 'unsigned long long' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:56:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:128:27: warning: implicit conversion changes signedness: 'int' to 'unsigned long long' [-Wsign-conversion]
   128 |         return ((1000000000ULL / hz) * (uint64_t)j);
       |                                ~ ^~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/override/include/linux/jiffies.h:135:24: warning: implicit conversion changes signedness: 'int' to 'unsigned long long' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/override/include/linux/jiffies.h:135:24: warning: implicit conversion changes signedness: 'int' to 'unsigned long long' [-Wsign-conversion]
   135 |         return ((1000000ULL / hz) * (uint64_t)j);
       |                             ~ ^~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:60:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/hex.h:37:26: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:60:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/hex.h:37:26: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
    37 |                 *bindst++ = (hi4 << 4) | lo4;
       |                           ~ ~~~~~~~~~~~^~~~~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:156:18: warning: implicit conversion changes signedness: 'size_t' (aka 'unsigned long') to 'ssize_t' (aka 'long') [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:34:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/rcupdate.h:37:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:156:18: warning: implicit conversion changes signedness: 'size_t' (aka 'unsigned long') to 'ssize_t' (aka 'long') [-Wsign-conversion]
   156 |         ssize_t ssize = size;
       |                 ~~~~~   ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:161:32: warning: implicit conversion loses integer precision: 'ssize_t' (aka 'long') to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:161:32: warning: implicit conversion loses integer precision: 'ssize_t' (aka 'long') to 'int' [-Wshorten-64-to-32]
   161 |         return ((i >= ssize) ? (ssize - 1) : i);
       |         ~~~~~~                  ~~~~~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:334:10: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:334:10: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
   334 |                                 hx = _h2b(*s);
       |                                    ~ ^~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:339:9: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:339:9: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
   339 |                         lx = _h2b(*s);
       |                            ~ ^~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:344:22: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kernel.h:344:22: warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
   344 |                 mac[i] = (hx << 4) | lx;
       |                        ~ ~~~~~~~~~~^~~~
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:11: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:11: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    60 |         return i + atomic_fetchadd_int(&v->counter, i);
       |         ~~~~~~ ~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:46: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:46: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    60 |         return i + atomic_fetchadd_int(&v->counter, i);
       |                    ~~~~~~~~~~~~~~~~~~~              ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:9: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:60:9: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    60 |         return i + atomic_fetchadd_int(&v->counter, i);
       |                ^ ~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:46: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:46: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    66 |         return atomic_fetchadd_int(&v->counter, -i) - i;
       |         ~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:48: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:48: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    66 |         return atomic_fetchadd_int(&v->counter, -i) - i;
       |                                                     ~ ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:42: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:66:42: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    66 |         return atomic_fetchadd_int(&v->counter, -i) - i;
       |                ~~~~~~~~~~~~~~~~~~~              ^~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:78:36: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:78:36: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
    78 |         atomic_store_rel_int(&v->counter, i);
       |         ~~~~~~~~~~~~~~~~~~~~              ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:96:45: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:96:45: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
    96 |         return atomic_fetchadd_int(&v->counter, 1) + 1;
       |         ~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:102:46: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:102:46: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   102 |         return atomic_fetchadd_int(&v->counter, -1) - 1;
       |         ~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:102:42: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:102:42: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   102 |         return atomic_fetchadd_int(&v->counter, -1) - 1;
       |                ~~~~~~~~~~~~~~~~~~~              ^~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:113:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:113:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   113 |                 if (likely(atomic_fcmpset_int(&v->counter, &c, c + a)))
       |                            ~~~~~~~~~~~~~~~~~~                  ~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
    61 | #define likely(x)                       __builtin_expect(!!(x), 1)
       |                                                             ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:127:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:127:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   127 |                 if (likely(atomic_fcmpset_int(&v->counter, &c, c + a)))
       |                            ~~~~~~~~~~~~~~~~~~                  ~~^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
    61 | #define likely(x)                       __builtin_expect(!!(x), 1)
       |                                                             ^
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
-In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:142:10: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/irq_work.h:36:
+In file included from /Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/workqueue.h:37:
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:142:10: warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
   142 |         return (atomic_swap_int(&v->counter, i));
       |         ~~~~~~  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:142:39: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:142:39: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   142 |         return (atomic_swap_int(&v->counter, i));
       |                 ~~~~~~~~~~~~~~~              ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:151:45: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:151:45: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   151 |                 if (atomic_fcmpset_int(&v->counter, &ret, new))
       |                     ~~~~~~~~~~~~~~~~~~                    ^~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:301:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/asm/atomic.h:301:52: warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
   301 |                 if (likely(atomic_fcmpset_int(&v->counter, &old, retval)))
       |                            ~~~~~~~~~~~~~~~~~~                    ^~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/compiler.h:61:41: note: expanded from macro 'likely'
    61 | #define likely(x)                       __builtin_expect(!!(x), 1)
       |                                                             ^
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:73:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:73:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
    72 |         return (uma_zalloc_arg(c->cache_zone, c,
       |                 ~~~~~~~~~~~~~~
    73 |             linux_check_m_flags(flags)));
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:80:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:80:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
    79 |         return (uma_zalloc_arg(c->cache_zone, c,
       |                 ~~~~~~~~~~~~~~
    80 |             linux_check_m_flags(flags | M_ZERO)));
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:132:7: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:132:7: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'int' [-Wshorten-64-to-32]
   130 |                 c->cache_zone = uma_zcreate(name, size,
       |                                 ~~~~~~~~~~~
   131 |                     linux_kmem_ctor, NULL, NULL, NULL,
   132 |                     align, UMA_ZONE_ZINIT);
       |                     ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:140:19: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:140:19: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'int' [-Wshorten-64-to-32]
   138 |                 c->cache_zone = uma_zcreate(name, size,
       |                                 ~~~~~~~~~~~
   139 |                     ctor ? linux_kmem_ctor : NULL, NULL,
   140 |                     NULL, NULL, align, 0);
       |                                 ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:145:18: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'unsigned int' [-Wshorten-64-to-32]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:145:18: warning: implicit conversion loses integer precision: 'size_t' (aka 'unsigned long') to 'unsigned int' [-Wshorten-64-to-32]
   145 |         c->cache_size = size;
       |                       ~ ^~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:219:38: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:219:38: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   218 |                 return (malloc_domainset(size, M_KMALLOC,
       |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   219 |                     linux_get_vm_domain_set(node), linux_check_m_flags(flags)));
       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:56:73: note: expanded from macro 'malloc_domainset'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:56:73: note: expanded from macro 'malloc_domainset'
    56 | #define malloc_domainset(size, type, ds, flags) malloc((size), (type), (flags))
       |                                                 ~~~~~~                  ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:222:38: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:222:38: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   221 |                 return (contigmalloc_domainset(size, M_KMALLOC,
       |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   222 |                     linux_get_vm_domain_set(node), linux_check_m_flags(flags),
       |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
   223 |                     0, -1UL, PAGE_SIZE, 0));
       |                     ~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:58:108: note: expanded from macro 'contigmalloc_domainset'
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/xkpi/bsdcompat/include/sys/malloc.h:58:108: note: expanded from macro 'contigmalloc_domainset'
    58 | #define contigmalloc_domainset(size, type, ds, flags, low, high, align, bnd) contigmalloc((size), (type), (flags), (low), (high), (align), (bnd))
       |                                                                              ~~~~~~~~~~~~                  ^~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:235:33: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:235:33: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   235 |                 return (malloc(_s, M_KMALLOC, linux_check_m_flags(flags)));
       |                         ~~~~~~                ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:237:39: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:237:39: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   237 |                 return (contigmalloc(_s, M_KMALLOC, linux_check_m_flags(flags),
       |                         ~~~~~~~~~~~~                ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:270:60: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:270:60: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   270 |                 return (realloc(__DECONST(void *, ptr), size, M_KMALLOC, linux_check_m_flags(flags)));
       |                         ~~~~~~~                                          ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:303:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:303:6: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   301 |         newptr = realloc(
       |                  ~~~~~~~
   302 |             __DECONST(void *, ptr), newsize, M_KMALLOC,
   303 |             linux_check_m_flags(flags));
       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
-/Users/yuuki/Documents/tretrauit/code/Raphaeli/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:347:43: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
+/Users/yuuki/Documents/tretrauit/code/Raphaeli/kpi/freebsd-src/sys/compat/linuxkpi/common/src/linux_slab.c:347:43: warning: implicit conversion changes signedness: 'gfp_t' (aka 'unsigned int') to 'int' [-Wsign-conversion]
   347 |         lmc->addr = malloc(lmc->size, M_KMALLOC, linux_check_m_flags(lmc->flags));
       |                     ~~~~~~                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 159 warnings generated.

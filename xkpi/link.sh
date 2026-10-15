@@ -16,7 +16,7 @@ mkdir -p "$K/MacOS"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlinker -kext \
   -Xlinker -source_version -Xlinker 1.0.0 \
   obj/*.o lkobj/*.o srcobj/*.o xnuobj/nmx_kext.o xnuobj/nmx_devfs.o xnuobj/nmx_dma.o \
-  xnuobj/nmx_fb.o xnuobj/nmx_mm.o xnuobj/nmx_pci.o xnuobj/nmx_platform.o xnuobj/nmx_vm.o \
+  xnuobj/nmx_fb.o xnuobj/nmx_accel.o xnuobj/nmx_accel_uc.o xnuobj/nmx_mm.o xnuobj/nmx_pci.o xnuobj/nmx_platform.o xnuobj/nmx_vm.o \
   -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
     grep -E "error|Undefined|duplicate" link.log | head -40; exit 1; }
 cp kext/Info.plist "$K/Info.plist"

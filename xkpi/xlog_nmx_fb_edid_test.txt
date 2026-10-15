@@ -1,0 +1,4 @@
+xnu/nmx_fb_edid_test.cpp:5:10: fatal error: 'assert.h' file not found
+    5 | #include <assert.h>
+      |          ^~~~~~~~~~
+1 error generated.

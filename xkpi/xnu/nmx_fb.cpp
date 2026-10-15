@@ -281,14 +281,3 @@ public:
     }
 };
 OSDefineMetaClassAndStructors(RaphaeliFB, IOFramebuffer)
-
-/* ---- retired bridge path ------------------------------------------------------------------------------------------ */
-
-/*
- * The framebuffer used to be published by hand from nmx_kext.cpp's attach thread through the port bridge
- * (nmx_fb_open in override/src/nmx_fb_bridge.c). It now matches the IOPCIDevice itself. These remain only because
- * nmx_kext.cpp still calls them; returning "no framebuffer" is what its callers already handle. The integration
- * lane should drop these calls and the extern declarations from nmx_kext.cpp.
- */
-IOService *nmx_fb_publish(IOService *, void *) { return nullptr; }
-void nmx_fb_unpublish(IOService *fb, IOService *, void *) { (void)fb; }

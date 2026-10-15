@@ -27,14 +27,13 @@
 #define AMD_VENDOR 0x1002
 #define INTEL_VENDOR 0x8086
 
-/* the display bridge (nmx_fb.cpp) */
-IOService *nmx_fb_publish(IOService *gpu, void *dev);
-void nmx_fb_unpublish(IOService *fb, IOService *gpu, void *dev);
+/* scanout lane self-check (override/display/nmx_scanout_selftest.c); inert unless the boot-arg
+   raphaeli-scanout-test=1 is set, in which case it allocates/pattern-checks/frees one frame */
+extern "C" int nmx_scanout_selftest(void);
 
 class Raphaeli : public IOService {
     OSDeclareDefaultStructors(Raphaeli)
     void *dev_;
-    IOService *fb_;
     IOPCIDevice *pci_;
     volatile int attach_;   /* 0 = attach pending on its thread, 1 = attached, -1 = not attached */
     bool pm_;
@@ -113,6 +112,7 @@ bool Raphaeli::start(IOService *provider)
             return false;
         }
         g_started = true;
+        nmx_scanout_selftest();
     }
     g_devices++;
     IOLockUnlock(g_lock);
@@ -125,7 +125,6 @@ bool Raphaeli::start(IOService *provider)
      */
     pci_ = pci;
     dev_ = nullptr;
-    fb_ = nullptr;
     pm_ = false;
     attach_ = 0;
     retain();
@@ -240,8 +239,6 @@ void Raphaeli::attachNow()
        the claim was pending, so matching on the device runs again now that it is set */
     pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
     pci_->registerService();
-    /* light the outputs and hand them to macOS; without it the device still renders, with no screen of its own */
-    fb_ = nmx_fb_publish(this, dev_);
     nmx_marker_write(false);
     IOLog("Raphaeli GPU: driving %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
           pci_->configRead16(kIOPCIConfigDeviceID));
@@ -255,9 +252,6 @@ void Raphaeli::stop(IOService *provider)
     for (int i = 0; attach_ == 0 && i < 6000; i++)
         IOSleep(100);
     provider->removeProperty("nmxgpu-claimed");
-    if (fb_ != nullptr)
-        nmx_fb_unpublish(fb_, this, dev_);
-    fb_ = nullptr;
     if (pm_)
         PMstop();
     pm_ = false;

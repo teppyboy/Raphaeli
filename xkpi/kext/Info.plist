@@ -31,6 +31,43 @@
       <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
       <key>IOProbeScore</key><integer>60000</integer>
     </dict>
+    <!-- RaphaeliFB: IOFramebuffer over the scanout buffer. Unlike the Raphaeli service above it has no probe()-level
+         opt-in (its gates are BAR0 + scanout allocation in start()), so the personality is deliberately narrowed to
+         the primary target device (780M, 0x15bf) instead of the vendor-wide match: a vendor-wide personality would
+         bind (allocate a scanout buffer + publish a framebuffer on) any AMD/Intel display-class GPU on hosts where
+         the user never opted in, including this dev host. Widening it needs an opt-in/probe gate in nmx_fb.cpp first.
+         Same IOMatchCategory-free default as Raphaeli780M; both can bind the one device (distinct default categories) -->
+    <key>RaphaeliFB</key><dict>
+      <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
+      <key>IOClass</key><string>RaphaeliFB</string>
+      <key>IOProviderClass</key><string>IOPCIDevice</string>
+      <key>IOPCIPrimaryMatch</key><string>0x000015bf&amp;0xffffffff</string>
+      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
+      <key>IOProbeScore</key><integer>1000</integer>
+    </dict>
+    <!-- RaphaeliAccel: IOAcceleratorFamily2 nub. Matches every AMD/Intel display-class function, but start()
+         declines unless the provider carries "nmxgpu-claimed" (set by the Raphaeli service after a successful
+         attach), so it is inert on hosts where the main service never claimed the GPU. The IOMatchCategory is what
+         allows Raphaeli and RaphaeliAccel on the same PCI function. No IOUserClientClass keys: the family's
+         IOGraphicsAccelerator2::newUserClient creates every standard client type itself -->
+    <key>RaphaeliAccel</key><dict>
+      <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
+      <key>IOClass</key><string>RaphaeliAccel</string>
+      <key>IOProviderClass</key><string>IOPCIDevice</string>
+      <key>IOPCIPrimaryMatch</key><string>0x00001002&amp;0x0000ffff</string>
+      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
+      <key>IOMatchCategory</key><string>IOAccelerator</string>
+      <key>IOProbeScore</key><integer>100</integer>
+    </dict>
+    <key>RaphaeliAccelIntel</key><dict>
+      <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
+      <key>IOClass</key><string>RaphaeliAccel</string>
+      <key>IOProviderClass</key><string>IOPCIDevice</string>
+      <key>IOPCIPrimaryMatch</key><string>0x00008086&amp;0x0000ffff</string>
+      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
+      <key>IOMatchCategory</key><string>IOAccelerator</string>
+      <key>IOProbeScore</key><integer>100</integer>
+    </dict>
   </dict>
   <key>OSBundleLibraries</key><dict>
     <key>com.apple.kpi.bsd</key><string>8.0</string>
@@ -41,5 +78,6 @@
     <key>com.apple.iokit.IOPCIFamily</key><string>1.0.0</string>
     <key>com.apple.iokit.IOACPIFamily</key><string>1.0.0</string>
     <key>com.apple.iokit.IOGraphicsFamily</key><string>1.0.0</string>
+    <key>com.apple.iokit.IOAcceleratorFamily2</key><string>2.0.0</string>
   </dict>
 </dict></plist>
