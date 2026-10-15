@@ -2,7 +2,7 @@
 # link.sh [out-dir]: links Raphaeli.kext from obj/ (AMD/DRM/TTM), lkobj/ (LinuxKPI runtime),
 # srcobj/ (FreeBSD-on-xnu layer) and xnuobj/ (IOKit glue). Run build.sh + rt.sh first.
 set -euo pipefail
-X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/xkpi
+X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 OUT=${1:-$X/out}
 cd "$X"
 
@@ -19,7 +19,7 @@ xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlink
   xnuobj/nmx_fb.o xnuobj/nmx_accel.o xnuobj/nmx_accel_uc.o xnuobj/nmx_mm.o xnuobj/nmx_pci.o xnuobj/nmx_platform.o xnuobj/nmx_vm.o \
   -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
     grep -E "error|Undefined|duplicate" link.log | head -40; exit 1; }
-cp kext/Info.plist "$K/Info.plist"
+cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 echo "Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B"
 # kmutil silently classifies kexts not owned by root:wheel as codeless ('No binaries or
 # codeless kexts were provided') regardless of signature; fix ownership before building the auxKC:

@@ -54,7 +54,7 @@ from datetime import datetime
 from typing import Any, NoReturn
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FW_STAGE_SH = os.path.join(SCRIPT_DIR, "fw", "stage.sh")
+FW_STAGE_SH = os.path.join(SCRIPT_DIR, "..", "Raphaeli", "Firmware", "stage.sh")
 GUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
 BOOT_ARG = "raphaeli-amd=1"
 KEXT_NAME = "Raphaeli.kext"
@@ -66,11 +66,11 @@ KEXTS_DIR = ""
 SYS_ROOT = "/"
 FW_SRC = ""
 # kext source: dist zip layout (kext/ next to tools/), then dev-tree layout
-# (xkpi/out/Raphaeli.kext when the script lives in xkpi/). Override: --kext-src
+# (out/Raphaeli.kext at the repo root). Override: --kext-src
 # or $RAPHAELI_KEXT.
 def _default_kext_src():
     for cand in (os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME),
-                 os.path.join(SCRIPT_DIR, "out", KEXT_NAME)):
+                 os.path.join(SCRIPT_DIR, "..", "out", KEXT_NAME)):
         if os.path.isdir(cand):
             return os.path.normpath(cand)
     return os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME)

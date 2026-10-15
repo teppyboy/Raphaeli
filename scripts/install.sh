@@ -1,8 +1,8 @@
 #!/bin/bash
 # Raphaeli install/deploy for the Radeon 780M target machine (Phoenix, 0x15bf, gfx1103).
 #
-# Installs xkpi/out/Raphaeli.kext into /Library/Extensions, stages AMD firmware
-# into /Library/Raphaeli/firmware (layout expected by xnu/nmx_platform.cpp),
+# Installs out/Raphaeli.kext into /Library/Extensions, stages AMD firmware
+# into /Library/Raphaeli/firmware (layout expected by Raphaeli/Kernel/nmx_platform.cpp),
 # builds an auxiliary kext collection offline via kmutil(8), and (opt-in)
 # sets the raphaeli-amd=1 boot-arg.
 #
@@ -22,20 +22,25 @@
 #   install.sh [--dry-run] [--apply] [kext-path]   # default kext: out/Raphaeli.kext
 #   install.sh [--dry-run] --uninstall
 #
-# Boot guard (xnu/nmx_kext.cpp): between attach start and hand-over the kext
+# Boot guard (Raphaeli/Kernel/nmx_kext.cpp): between attach start and hand-over the kext
 # sets the NVRAM marker raphaeli-gpu-attaching; if the marker is still set at
 # the next boot the driver parks itself and the GPU stays with macOS. Clear it
 # with: nvram -d raphaeli-gpu-attaching
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)   # Raphaeli/ project root (contains xkpi/ and firmware/)
+REPO_DIR=$(cd "$SCRIPT_DIR/.." && pwd)   # project root (contains scripts/, Raphaeli/, firmware/)
 
 KEXT_ID="me.tretrauit.raphaeli"
 DEST_KEXT="/Library/Extensions/Raphaeli.kext"
 FW_ROOT="/Library/Raphaeli/firmware"
 FW_SRC="${RAPHAELI_FW_SRC:-$REPO_DIR/firmware/amdgpu}"
-FW_STAGE_SH="$SCRIPT_DIR/fw/stage.sh"
+# dist zip layout keeps stage.sh in tools/fw next to tools/install.sh; the dev tree keeps it in Raphaeli/Firmware/
+if [[ -f $SCRIPT_DIR/fw/stage.sh ]]; then
+  FW_STAGE_SH=$SCRIPT_DIR/fw/stage.sh
+else
+  FW_STAGE_SH=$REPO_DIR/Raphaeli/Firmware/stage.sh
+fi
 AUXKC_OUT="/Library/KernelCollections/Raphaeli.auxkc"
 KDK_DIR="/Library/Developer/KDKs"
 BOOT_ARG="raphaeli-amd=1"
@@ -133,7 +138,7 @@ fi
 
 # ---- (1) validate the kext bundle ------------------------------------------
 
-KEXT_SRC=${KEXT_SRC:-$SCRIPT_DIR/out/Raphaeli.kext}
+KEXT_SRC=${KEXT_SRC:-$REPO_DIR/out/Raphaeli.kext}
 log "validating kext bundle: $KEXT_SRC"
 [[ -d $KEXT_SRC/Contents ]] || die "not a kext bundle: $KEXT_SRC"
 plutil -lint "$KEXT_SRC/Contents/Info.plist" >/dev/null || die "Info.plist does not lint"

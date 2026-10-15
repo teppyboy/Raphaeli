@@ -29,7 +29,7 @@ assert_out() { # assert_out <name> <pattern> (uses $out from last t)
   fi
 }
 
-KEXT="$HERE/out/Raphaeli.kext"
+KEXT="$HERE/../out/Raphaeli.kext"
 TMPFW=$(mktemp -d)
 
 # full dry-run with a complete temp firmware source (real sources lack ip_discovery.bin)
@@ -44,7 +44,7 @@ t "nonexistent kext fails"    1 "$INSTALL" --dry-run /tmp/no-such.kext
 RAPHAELI_FW_SRC=$TMPFW t "full dry-run succeeds" 0 env RAPHAELI_FW_SRC=$TMPFW "$INSTALL" --dry-run
 assert_out "dry-run prints ditto"        "DRY-RUN: sudo ditto"
 assert_out "dry-run prints chown"        "DRY-RUN: sudo chown -R root:wheel /Library/Extensions/Raphaeli.kext"
-assert_out "dry-run prints stage.sh"     "DRY-RUN: sudo sh *fw/stage.sh"
+assert_out "dry-run prints stage.sh"     "DRY-RUN: sudo sh *Firmware/stage.sh"
 assert_out "dry-run prints kmutil"       "DRY-RUN: sudo kmutil create"
 assert_out "dry-run prints auxkc path"   "/Library/KernelCollections/Raphaeli.auxkc"
 assert_out "prints apply step (cp)"      "sudo cp /Library/KernelCollections/Raphaeli.auxkc"
