@@ -5,7 +5,9 @@ set -euo pipefail
 R=$(cd "$(dirname "$0")/.." && pwd)
 cd "$R"
 
-VERSION=${1:-1.0.0}
+# Bleeding edge: name releases by commit hash, not a version number.
+HASH=$(git rev-parse --short HEAD)
+VERSION=${1:-$HASH}
 ARCH=x86_64
 NAME="Raphaeli-$VERSION-$ARCH"
 STAGE="dist/$NAME"
@@ -20,6 +22,9 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE"/{kext,usr/lib,firmware/amdgpu,tools/fw}
 
 ditto "$KEXT" "$STAGE/kext/Raphaeli.kext"
+# stamp the staged kext with the commit it was built from
+plutil -replace CFBundleVersion -string "$HASH" "$STAGE/kext/Raphaeli.kext/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$HASH" "$STAGE/kext/Raphaeli.kext/Contents/Info.plist"
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"

@@ -1,5 +1,6 @@
 #!/bin/bash
 # build.sh [N]: compiles every source of the AMD render path in parallel and ranks the remaining errors (top N).
+bash "$(dirname "$0")/kpi-init.sh" || exit 1
 # Sources are exactly what drm-kmod's Makefiles build for amdgpu (minus the display core), drm, ttm and dmabuf,
 # evaluated against amd.flags, minus files that are GPL-only or built on FreeBSD file descriptors or its console;
 # the port supplies its own code for those.

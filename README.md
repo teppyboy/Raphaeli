@@ -19,7 +19,6 @@ Raphaeli/            the kext (bundle Raphaeli.kext, id me.tretrauit.raphaeli)
   Compat/              FreeBSD-on-XNU compatibility layer (src/ + include/)
   Override/            LinuxKPI/drm-kmod forks and replacements (src/, display/, i915/, xe/, linux/, include/)
   Firmware/            firmware staging (stage.sh + blob-name README)
-  Attic/               parked NPU lane (kext-npu/, override-npu/, nmx_npu_kext.cpp, cc-npu*/all-npu*/fork_npu)
 scripts/             every build/tooling script (single build entry)
   build.sh             900 drm-kmod AMD/DRM/TTM sources -> obj/        (900/900)
   rt.sh                77 runtime sources -> lkobj/, srcobj/, xnuobj/  (77/77; 78th was the parked NPU glue)
@@ -31,14 +30,12 @@ scripts/             every build/tooling script (single build entry)
   gen_ccdb.sh / gen_flags.py / srclist.py / xesrc.py / fork_*.py   generators
   tests/               host-side selftests (nmx_fb_edid_test.cpp)
 docs/                design notes + lane contracts (docs/reports/ = key audit reports)
-patches/             mesa-macos.patch, libdrm-macos.patch
-kpi/                 pinned reference trees (symlinks into research/): drm-kmod, freebsd-src
-vendor/              source provenance (SOURCES.md)
-probe/               hardware probe tool
+patches/             source patches: mesa-macos, libdrm-macos, freebsd-src-linuxkpi (applied to kpi/ submodules)
+kpi/                 pinned git submodules (upstream freebsd trees): drm-kmod, freebsd-src
 out/, out-disp/, dist/, firmware/, work-*/, obj*/, lkobj/, srcobj/, xnuobj/, logs*/   gitignored build trees
 ```
 
-The enclosing research trees under `research/` (drm-kmod, freebsd-src, mesa, linux-6.14) are reference-only and never committed; `vendor/SOURCES.md` records the pins.
+The enclosing research trees under `research/` (drm-kmod, freebsd-src, mesa, linux-6.14) are reference-only and never committed; `docs/SOURCES.md` records the pins.
 
 ## Build and validate (dev host, macOS 15 x86_64)
 
@@ -48,7 +45,7 @@ cd scripts
 ./rt.sh                  # rebuild runtime against current headers -> 77/77
 ./link.sh out            # link out/Raphaeli.kext (x86_64, macOS 15+)
 kmutil inspect -V tb     # sanity-check the boot kernel collection
-./package.sh 1.0.2       # dist/Raphaeli-1.0.2-x86_64.zip (kext + RADV libs + firmware + tools)
+./package.sh             # dist/Raphaeli-<short-commit>-x86_64.zip (kext + RADV libs + firmware + tools)
 ```
 
 Tests (no system changes):
@@ -73,10 +70,10 @@ Install routes: OpenCore (black-screen-safe, `tools/oc-install.py`) or direct ke
 ## Local limits and legal gates
 
 - Development host is an x86_64 macOS 15.7.8 (24G824) Hackintosh with AMFI and Secure Boot disabled (kexts need no signing), but it has no Radeon 780M - Phoenix GPU initialization can only be validated on the target machine. A matching KDK (KDK_15.7.8_24G824) is installed for kernel-collection validation.
-- Mesa/libdrm pins and the drm-kmod/FreeBSD LinuxKPI revisions are recorded in `vendor/SOURCES.md`; the trees live under `research/`.
+- Mesa/libdrm pins and the drm-kmod/FreeBSD LinuxKPI revisions are recorded in `docs/SOURCES.md`; the trees are git submodules under `kpi/` (local edits applied via `patches/*.patch`, see `scripts/kpi-init.sh`).
 - The source tree derives from FreeBSD LinuxKPI/drm-kmod and includes multiple licenses. Before distribution, audit exact compiled files, their SPDX identifiers, all dependencies, and applicable source-offer obligations. Never distribute firmware without verifying its license and checksum.
 - The reference AMD kext/display bridge is an unvalidated prototype. Do not install it on a daily-boot system without tested recovery.
 
 ## Status
 
-The port builds and links end-to-end on the dev host (900/900 kernel sources, 77/77 runtime sources, `Raphaeli.kext` ~10.9 MB; only kernel-provided IOKit/libkern symbols remain undefined), packages as `dist/`, and has offline install tooling with tests. It has not been loaded on hardware. The NPU lane is parked in `Raphaeli/Attic/`. This does not claim Radeon 780M macOS support.
+The port builds and links end-to-end on the dev host (900/900 kernel sources, 79/79 runtime sources, `Raphaeli.kext` ~10.9 MB; only kernel-provided IOKit/libkern symbols remain undefined), packages as `dist/`, and has offline install tooling with tests. It has not been loaded on hardware. This does not claim Radeon 780M macOS support.

@@ -195,8 +195,11 @@ def load_config() -> "dict":
 
 def save_config(cfg: "dict") -> None:
     tmp = CONFIG + ".raphaeli-tmp"
-    with open(tmp, "wb") as f:
-        plistlib.dump(cfg, f, fmt=plistlib.FMT_XML)
+    try:
+        with open(tmp, "wb") as f:
+            plistlib.dump(cfg, f, fmt=plistlib.FMT_XML)
+    except OSError as e:
+        die(f"cannot write {tmp}: {e}")
     os.replace(tmp, CONFIG)
 
 
@@ -251,8 +254,11 @@ def set_bootargs(cfg: "dict", new: str) -> None:
 def fw_list(block: str) -> "list[str]":
     if not os.path.isfile(FW_STAGE_SH):
         die("fw/stage.sh not found next to oc-install.py")
-    with open(FW_STAGE_SH) as f:
-        text = f.read()
+    try:
+        with open(FW_STAGE_SH) as f:
+            text = f.read()
+    except OSError as e:
+        die(f"cannot read {FW_STAGE_SH}: {e}")
     m = re.search(rf'^{block}="\n(.*?)^\s*"\s*$', text, re.M | re.S)
     if m is None:
         die(f"cannot parse {block} list from fw/stage.sh")
@@ -315,8 +321,11 @@ def stage_firmware() -> None:
         print("DRY-RUN: mkdir -p", fwroot)
         print("DRY-RUN: sh", FW_STAGE_SH, FW_SRC, fwroot)
         return
-    os.makedirs(fwroot, exist_ok=True)
-    r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, fwroot])
+    try:
+        os.makedirs(fwroot, exist_ok=True)
+        r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, fwroot])
+    except OSError as e:
+        die(f"firmware staging failed: {e}")
     if r.returncode != 0:
         die("fw/stage.sh failed")
 
@@ -329,7 +338,10 @@ def copy_kext(src: str, dst: str) -> None:
         print("DRY-RUN: cp -a", src, dst)
         return
     if os.path.exists(dst):
-        shutil.rmtree(dst)
+        try:
+            shutil.rmtree(dst)
+        except OSError as e:
+            die(f"cannot remove {dst}: {e}")
     shutil.copytree(src, dst, symlinks=True)
 
 
@@ -436,7 +448,10 @@ def action_remove() -> None:
         if DRY_RUN:
             print("DRY-RUN: rm -rf", staged)
         else:
-            shutil.rmtree(staged)
+            try:
+                shutil.rmtree(staged)
+            except OSError as e:
+                die(f"cannot remove {staged}: {e}")
     else:
         log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
     log("backups (config.plist.raphaeli-backup-*) are kept")
