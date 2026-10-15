@@ -22,3 +22,9 @@ srcs*.txt
 npu-src/
 linux-6.14/
 dist/
+
+# Python
+*.pyc
+
+# macOS
+.DS_Store
