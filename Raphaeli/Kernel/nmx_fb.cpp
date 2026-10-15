@@ -5,10 +5,12 @@
  * out; there is no copy. It attaches only when the BAR0 gate (the same one Raphaeli::start() uses) passes and the
  * scanout allocation succeeds; otherwise the firmware framebuffer keeps the screen.
  *
- * One mode (panel-native when the VBIOS carries a readable EDID, else the documented 1920x1080@60 placeholder in
- * nmx_fb_internal.h), XRGB8888. The IOFramebuffer behaviour (one fixed mode, timing, power acknowledged at once,
- * the colour answers WindowServer asks, a 60 Hz timer as the VBL until the display interrupt is wired) is the same
- * as NMIntelFB's, which met the same WindowServer.
+ * All modes of the panel's EDID when the VBIOS carries one (every sane detailed timing plus established/
+ * standard timings, preferred timing first, nmx_fb_edid_modes in nmx_fb_internal.h), else the documented
+ * 1920x1080@60 placeholder in nmx_fb_internal.h. XRGB8888 throughout; the scanout buffer holds the startup
+ * (preferred) mode, so WindowServer may switch only to modes that fit it. The IOFramebuffer behaviour (mode
+ * list + per-mode timings, power acknowledged at once, a 60-ish Hz timer as the VBL until the display
+ * interrupt is wired) is the same as NMIntelFB's, which met the same WindowServer.
  */
 #include <IOKit/IOLib.h>
 #include <IOKit/graphics/IOFramebuffer.h>
@@ -31,36 +33,46 @@ static uint32_t pitchFor(uint32_t width)
 }
 
 /*
- * The panel's native timing, read out of the VBIOS the PCI ROM BAR maps (nmx_xnu_pci_rom also falls back to the
- * vbios/rom DeviceProperties): the first EDID block with a valid checksum and a sane detailed timing wins
- * (nmx_fb_edid_timing in nmx_fb_internal.h). Anything unreadable or malformed leaves the documented
- * 1920x1080@60 placeholder.
+ * Mode discovery: the first EDID 1.x block in the VBIOS the PCI ROM BAR maps (nmx_xnu_pci_rom also falls back
+ * to the vbios/rom DeviceProperties) that yields any sane mode supplies the whole list (nmx_fb_edid_modes:
+ * every detailed timing plus established/standard timings, preferred first). No readable EDID leaves the
+ * documented 1920x1080@60 placeholder as the only mode, clearly logged.
  */
-static NMXFbMode fbMode(IOService *provider)
+static uint32_t fbModes(IOService *provider, NMXFbMode *modes)
 {
-    NMXFbMode m = { NMX_FB_DEFAULT_WIDTH, NMX_FB_DEFAULT_HEIGHT, pitchFor(NMX_FB_DEFAULT_WIDTH),
-                    NMX_FB_DEFAULT_PCLK_HZ, NMX_FB_DEFAULT_HBLANK, NMX_FB_DEFAULT_VBLANK,
-                    NMX_FB_DEFAULT_HSYNC_OFF, NMX_FB_DEFAULT_HSYNC_PW, NMX_FB_DEFAULT_VSYNC_OFF,
-                    NMX_FB_DEFAULT_VSYNC_PW };
+    modes[0] = NMXFbMode { NMX_FB_DEFAULT_WIDTH, NMX_FB_DEFAULT_HEIGHT, pitchFor(NMX_FB_DEFAULT_WIDTH),
+                           NMX_FB_DEFAULT_PCLK_HZ, NMX_FB_DEFAULT_HBLANK, NMX_FB_DEFAULT_VBLANK,
+                           NMX_FB_DEFAULT_HSYNC_OFF, NMX_FB_DEFAULT_HSYNC_PW, NMX_FB_DEFAULT_VSYNC_OFF,
+                           NMX_FB_DEFAULT_VSYNC_PW, true };
     const size_t kRomMax = 128 * 1024;
     uint8_t *rom = (uint8_t *)IOMalloc(kRomMax);
     if (rom == nullptr)
-        return m;
+        return 1;
     size_t n = nmx_xnu_pci_rom(provider, rom, kRomMax);
     static const uint8_t kEdidHeader[8] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
+    uint32_t count = 0;
     for (size_t i = 0; n >= 128 && i + 128 <= n; i++) {
         if (memcmp(rom + i, kEdidHeader, sizeof(kEdidHeader)) != 0)
             continue;
-        if (nmx_fb_edid_timing(rom + i, &m))   /* corrupted/insane block: keep scanning */
+        count = nmx_fb_edid_modes(rom + i, modes, NMX_FB_MAX_MODES);   /* malformed block: keep scanning */
+        if (count)
             break;
     }
     IOFree(rom, kRomMax);
-    return m;
+    if (count == 0) {
+        FBLOG("no usable EDID in the VBIOS; keeping the documented %ux%u@60 placeholder as the only mode",
+              NMX_FB_DEFAULT_WIDTH, NMX_FB_DEFAULT_HEIGHT);
+        return 1;
+    }
+    return count;
 }
 
 class RaphaeliFB : public IOFramebuffer {
     OSDeclareDefaultStructors(RaphaeliFB)
-    NMXFbMode fMode = {};
+    /* display mode IDs are index+1; fModes[0] (preferred) is also the startup mode */
+    NMXFbMode fModes[NMX_FB_MAX_MODES] = {};
+    uint32_t fModeCount = 0, fModeIndex = 0;
+    vm_size_t fBufSize = 0;   /* scanout bytes allocated; only modes that fit may be switched to */
     vm_offset_t fPhys = 0;
     vm_offset_t fKern = 0;
     vm_size_t fMapped = 0;
@@ -84,19 +96,22 @@ class RaphaeliFB : public IOFramebuffer {
     }
 
 public:
-    bool initWith(const NMXFbMode &mode) {
-        if (!init()) return false;
-        fMode = mode;
-        uint64_t htotal = (uint64_t)mode.width + mode.hblank;
-        uint64_t vtotal = (uint64_t)mode.height + mode.vblank;
-        if (mode.pclk_hz && htotal > mode.width && vtotal > mode.height) {
-            uint64_t mhz = mode.pclk_hz * 1000 / (htotal * vtotal);   /* milli-Hz */
+    static uint32_t indexFor(IODisplayModeID mode) { return mode >= 1 ? (uint32_t)(mode - 1) : (uint32_t)-1; }
+    const NMXFbMode &curMode() const { return fModes[fModeIndex]; }
+    /* refresh/frame time of the current mode, from pclk/(htotal*vtotal) */
+    void applyMode() {
+        const NMXFbMode &m = curMode();
+        uint64_t htotal = (uint64_t)m.width + m.hblank;
+        uint64_t vtotal = (uint64_t)m.height + m.vblank;
+        fRefresh16 = 60 << 16;
+        fFrameNs = 16666667ull;
+        if (m.pclk_hz && htotal > m.width && vtotal > m.height) {
+            uint64_t mhz = m.pclk_hz * 1000 / (htotal * vtotal);   /* milli-Hz */
             if (mhz >= 20000 && mhz <= 500000) {
                 fRefresh16 = (uint32_t)((mhz << 16) / 1000);
                 fFrameNs = 1000000000000ull / mhz;
             }
         }
-        return true;
     }
 
     bool start(IOService *provider) override {
@@ -110,14 +125,17 @@ public:
             FBLOG("no usable MMIO BAR0; this display stays with the firmware framebuffer");
             return false;
         }
-        fMode = fbMode(provider);
-        vm_size_t want = (vm_size_t)fMode.pitch * fMode.height;
+        fModeCount = fbModes(provider, fModes);
+        fModeIndex = 0;
+        applyMode();
+        vm_size_t want = (vm_size_t)curMode().pitch * curMode().height;
         /* the scanout lane owns the buffer (bsdcompat/src/nmx_scanout.c); no buffer, no framebuffer */
         if (nmx_scanout_alloc(want, &fPhys, &fKern, &fMapped) != KERN_SUCCESS || fMapped < want) {
             FBLOG("scanout allocation failed; this display stays with the firmware framebuffer");
             fPhys = 0; fKern = 0; fMapped = 0;
             return false;
         }
+        fBufSize = want;
         if (!IOFramebuffer::start(provider)) {
             nmx_scanout_free(fPhys, fMapped);
             fPhys = 0; fKern = 0; fMapped = 0;
@@ -133,8 +151,8 @@ public:
             fVblNext = d;
             thread_call_enter_delayed(fVblTimer, d);
         }
-        FBLOG("framebuffer %ux%u at %u.%02u Hz", fMode.width, fMode.height, fRefresh16 >> 16,
-              ((fRefresh16 & 0xFFFF) * 100) >> 16);
+        FBLOG("%u display mode%s, %ux%u at %u.%02u Hz", fModeCount, fModeCount == 1 ? "" : "s",
+              curMode().width, curMode().height, fRefresh16 >> 16, ((fRefresh16 & 0xFFFF) * 100) >> 16);
         return true;
     }
 
@@ -157,27 +175,35 @@ public:
     bool isConsoleDevice() override { return true; }
     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
         if (aperture != kIOFBSystemAperture) return nullptr;
-        return IODeviceMemory::withRange(fPhys, (IOPhysicalLength)fMode.pitch * fMode.height);
+        return IODeviceMemory::withRange(fPhys, (IOPhysicalLength)curMode().pitch * curMode().height);
     }
     IODeviceMemory *getVRAMRange() override { return IODeviceMemory::withRange(fPhys, fMapped); }
     const char *getPixelFormats() override { return IO32BitDirectPixels "\0"; }
-    IOItemCount getDisplayModeCount() override { return 1; }
-    IOReturn getDisplayModes(IODisplayModeID *modes) override { modes[0] = 1; return kIOReturnSuccess; }
+    IOItemCount getDisplayModeCount() override { return fModeCount; }
+    IOReturn getDisplayModes(IODisplayModeID *modes) override {
+        for (uint32_t i = 0; i < fModeCount; i++) modes[i] = (IODisplayModeID)(i + 1);
+        return kIOReturnSuccess;
+    }
     IOReturn getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info) override {
-        if (mode != 1 || !info) return kIOReturnBadArgument;
+        uint32_t i = indexFor(mode);
+        if (i >= fModeCount || !info) return kIOReturnBadArgument;
         bzero(info, sizeof(*info));
-        info->nominalWidth = fMode.width;
-        info->nominalHeight = fMode.height;
-        info->refreshRate = fRefresh16;
-        info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
+        info->nominalWidth = fModes[i].width;
+        info->nominalHeight = fModes[i].height;
+        info->refreshRate = (uint32_t)nmx_fb_refresh16(&fModes[i]);
+        info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag;
+        if (i == 0) info->flags |= kDisplayModeDefaultFlag;
         return kIOReturnSuccess;
     }
     UInt64 getPixelFormatsForDisplayMode(IODisplayModeID, IOIndex) override { return 0; }
     IOReturn getPixelInformation(IODisplayModeID mode, IOIndex depth, IOPixelAperture aperture,
                                  IOPixelInformation *pi) override {
-        if (mode != 1 || depth != 0 || aperture != kIOFBSystemAperture || !pi) return kIOReturnUnsupportedMode;
+        uint32_t i = indexFor(mode);
+        if (i >= fModeCount || depth != 0 || aperture != kIOFBSystemAperture || !pi)
+            return kIOReturnUnsupportedMode;
+        const NMXFbMode &m = fModes[i];
         bzero(pi, sizeof(*pi));
-        pi->bytesPerRow = fMode.pitch;
+        pi->bytesPerRow = m.pitch;
         pi->bitsPerPixel = NMX_FB_BPP;
         pi->pixelType = kIORGBDirectPixels;
         pi->componentCount = 3;
@@ -186,20 +212,22 @@ public:
         pi->componentMasks[1] = 0x0000FF00;
         pi->componentMasks[2] = 0x000000FF;
         strlcpy(pi->pixelFormat, IO32BitDirectPixels, sizeof(pi->pixelFormat));
-        pi->activeWidth = fMode.width;
-        pi->activeHeight = fMode.height;
+        pi->activeWidth = m.width;
+        pi->activeHeight = m.height;
         return kIOReturnSuccess;
     }
     IOReturn getCurrentDisplayMode(IODisplayModeID *mode, IOIndex *depth) override {
-        *mode = 1; *depth = 0; return kIOReturnSuccess;
+        if (!mode || !depth) return kIOReturnBadArgument;
+        *mode = (IODisplayModeID)(fModeIndex + 1); *depth = 0; return kIOReturnSuccess;
     }
     IOReturn getStartupDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { return getCurrentDisplayMode(mode, depth); }
-    /* without a timing, WindowServer shows the display at 0.00 Hz (seen with NMIntelFB) */
+    /* per-mode timing from the EDID; without it WindowServer shows the display at 0.00 Hz (seen with NMIntelFB) */
     IOReturn getTimingInfoForDisplayMode(IODisplayModeID mode, IOTimingInformation *info) override {
-        if (mode != 1 || !info) return kIOReturnUnsupportedMode;
+        uint32_t i = indexFor(mode);
+        if (i >= fModeCount || !info) return kIOReturnUnsupportedMode;
         bzero(info, sizeof(*info));
         info->appleTimingID = kIOTimingIDInvalid;
-        const NMXFbMode &t = fMode;
+        const NMXFbMode &t = fModes[i];
         if (!t.pclk_hz || t.hblank == 0 || t.vblank == 0) return kIOReturnSuccess;
         IODetailedTimingInformationV2 &d = info->detailedInfo.v2;
         d.pixelClock = d.minPixelClock = d.maxPixelClock = t.pclk_hz;
@@ -215,7 +243,18 @@ public:
         return kIOReturnSuccess;
     }
     IOReturn setDisplayMode(IODisplayModeID mode, IOIndex depth) override {
-        return (mode == 1 && depth == 0) ? kIOReturnSuccess : kIOReturnUnsupported;
+        uint32_t i = indexFor(mode);
+        if (i >= fModeCount || depth != 0) return kIOReturnUnsupported;
+        const NMXFbMode &m = fModes[i];
+        /* the display engine stays at the firmware timing; the scanout buffer only holds modes that fit it */
+        if ((vm_size_t)m.pitch * m.height > fBufSize) {
+            FBLOG("mode %ux%u needs %u scanout bytes, only %u allocated; refusing", m.width, m.height,
+                  (uint32_t)((vm_size_t)m.pitch * m.height), (uint32_t)fBufSize);
+            return kIOReturnUnsupported;
+        }
+        fModeIndex = i;
+        applyMode();
+        return kIOReturnSuccess;
     }
     IOItemCount getConnectionCount() override { return 1; }
     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref,
@@ -230,7 +269,7 @@ public:
     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnSuccess; }
     IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { return kIOReturnSuccess; }
     IOReturn setApertureEnable(IOPixelAperture, IOOptionBits) override { return kIOReturnSuccess; }
-    IOReturn setStartupDisplayMode(IODisplayModeID, IOIndex) override { return kIOReturnSuccess; }
+    IOReturn setStartupDisplayMode(IODisplayModeID mode, IOIndex depth) override { return setDisplayMode(mode, depth); }
     /* power acknowledged at once; left to IOFramebuffer it waits on a shared thread (seen with NVRMFB) */
     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
@@ -261,8 +300,9 @@ public:
             return IOFramebuffer::setAttributeForConnection(idx, attribute, value);
         }
     }
-    IOReturn connectFlags(IOIndex, IODisplayModeID, IOOptionBits *flags) override {
-        if (flags) *flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
+    IOReturn connectFlags(IOIndex, IODisplayModeID mode, IOOptionBits *flags) override {
+        if (flags) *flags = kDisplayModeValidFlag | kDisplayModeSafeFlag
+                          | (mode == 1 ? kDisplayModeDefaultFlag : 0);
         return kIOReturnSuccess;
     }
     IOReturn getAttribute(IOSelect attribute, uintptr_t *value) override {
