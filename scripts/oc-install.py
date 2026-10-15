@@ -335,8 +335,16 @@ def action_add() -> None:
     cfg = load_config()
     idx = find_entry_index(cfg)
     if idx is not None:
-        log(f"config entry already present at Kernel>Add:{idx} (nothing to insert)")
-        enabled = cfg["Kernel"]["Add"][idx].get("Enabled")
+        log(f"config entry already present at Kernel>Add:{idx}")
+        entry = cfg["Kernel"]["Add"][idx]
+        if entry.get("Comment") != KEXT_NAME:
+            log(f"refreshing Comment -> {KEXT_NAME!r}")
+            entry["Comment"] = KEXT_NAME
+            if DRY_RUN:
+                print(f"DRY-RUN: set :Kernel:Add:{idx}:Comment = {KEXT_NAME}")
+            else:
+                save_config(cfg)
+        enabled = entry.get("Enabled")
         if enabled is not True:
             die(f"existing entry has Enabled={enabled}; fix config.plist manually")
     else:
@@ -357,7 +365,7 @@ def action_add() -> None:
         entry = {
             "Arch": "x86_64",
             "BundlePath": KEXT_NAME,
-            "Comment": f"Raphaeli 780M (me.tretrauit.raphaeli) - inert until {BOOT_ARG}",
+            "Comment": KEXT_NAME,
             "Enabled": True,
             "ExecutablePath": "Contents/MacOS/Raphaeli",
             "MaxKernel": "",

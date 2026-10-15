@@ -75,9 +75,12 @@
     <key>com.apple.kpi.libkern</key><string>8.0</string>
     <key>com.apple.kpi.mach</key><string>8.0</string>
     <key>com.apple.kpi.unsupported</key><string>8.0</string>
-    <key>com.apple.iokit.IOPCIFamily</key><string>1.0.0</string>
-    <key>com.apple.iokit.IOACPIFamily</key><string>1.0.0</string>
-    <key>com.apple.iokit.IOGraphicsFamily</key><string>1.0.0</string>
+    <!-- request versions must be <= each family's OSBundleCompatibleVersion (KDK 15.7.8:
+         IOPCIFamily/IOGraphicsFamily 1.0.0b1, IOACPIFamily 1.0.0d1, IOAcceleratorFamily2 2.0.0);
+         requesting 1.0.0 where only 1.0.0b1 exists fails OC prelinked injection (Invalid Parameter) -->
+    <key>com.apple.iokit.IOPCIFamily</key><string>1.0.0b1</string>
+    <key>com.apple.iokit.IOACPIFamily</key><string>1.0.0d1</string>
+    <key>com.apple.iokit.IOGraphicsFamily</key><string>1.0.0b1</string>
     <key>com.apple.iokit.IOAcceleratorFamily2</key><string>2.0.0</string>
   </dict>
 </dict></plist>
