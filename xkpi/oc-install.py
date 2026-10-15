@@ -45,11 +45,11 @@ Linux path (no macOS needed):
 """
 
 import os
+import plistlib
 import re
 import shutil
 import subprocess
 import sys
-import plistlib
 from datetime import datetime
 from typing import Any, NoReturn
 
@@ -65,7 +65,17 @@ CONFIG = ""
 KEXTS_DIR = ""
 SYS_ROOT = "/"
 FW_SRC = ""
-KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or os.path.join(SCRIPT_DIR, "out", KEXT_NAME)
+# kext source: dist zip layout (kext/ next to tools/), then dev-tree layout
+# (xkpi/out/Raphaeli.kext when the script lives in xkpi/). Override: --kext-src
+# or $RAPHAELI_KEXT.
+def _default_kext_src():
+    for cand in (os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME),
+                 os.path.join(SCRIPT_DIR, "out", KEXT_NAME)):
+        if os.path.isdir(cand):
+            return os.path.normpath(cand)
+    return os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME)
+
+KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or _default_kext_src()
 
 
 def die(msg: str) -> NoReturn:
@@ -508,4 +518,8 @@ def main(argv: "list[str]") -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except (OSError, ValueError, KeyError, plistlib.InvalidFileException) as e:
+        print(f"oc-install.py: {e}", file=sys.stderr)
+        sys.exit(1)
