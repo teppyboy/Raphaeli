@@ -27,4 +27,4 @@ dist/
 *.pyc
 
 # macOS
-.DS_Store
+.DS_Storexkpi/.cache/
