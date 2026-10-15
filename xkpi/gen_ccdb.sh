@@ -19,6 +19,18 @@ flags = shlex.split(sys.argv[2].replace("\n", " "))
 entries = []
 for f in sorted(glob.glob(root + "/bsdcompat/src/*.c")):
     entries.append({"directory": root, "file": f, "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"] + flags + ["-c", f]})
+# the IOKit glue (xnu/*.cpp): ccxx.sh's flags — Apple's Kernel.framework headers, the nmxxnu boundary
+# includes, no FreeBSD tree. Without these clangd/pi-lens fall back to a header-less parse.
+import os
+sdk = os.popen("xcrun --sdk macosx --show-sdk-path").read().strip()
+KF = sdk + "/System/Library/Frameworks/Kernel.framework/Headers"
+xnuflags = ["-arch", "x86_64", "-mmacosx-version-min=15.0", "-mkernel", "-fapple-kext", "-nostdinc",
+            "-isysroot", sdk, "-I", KF, "-I" + root + "/bsdcompat/include/nmxxnu",
+            "-DKERNEL", "-DKERNEL_PRIVATE", "-DDRIVER_PRIVATE", "-DAPPLE", "-DNeXT",
+            "-std=c++17", "-fno-rtti", "-fno-exceptions", "-fno-builtin", "-fno-common", "-O2",
+            "-Wall", "-Wno-unused-parameter", "-Wno-deprecated-declarations", "-Wno-inconsistent-missing-override"]
+for f in sorted(glob.glob(root + "/xnu/*.cpp")):
+    entries.append({"directory": root, "file": f, "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"] + xnuflags + ["-c", f]})
 pathlib.Path(root + "/compile_commands.json").write_text(json.dumps(entries, indent=1))
 print("entries:", len(entries))
 EOF

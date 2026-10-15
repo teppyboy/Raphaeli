@@ -1,17 +1,22 @@
 /*
- * The display bridge, IOKit side: an IOFramebuffer whose VRAM is the scan-out buffer the DRM side lit
- * (override/src/nmx_fb_bridge.c). WindowServer draws into it and the GPU's display engine scans it out; there is no
- * copy. One mode (the largest connected output's), XRGB8888.
+ * The display path: a real IOFramebuffer that matches the GPU's IOPCIDevice directly (Info.plist personality,
+ * added by the integration lane) and backs every pixel in a scan-out buffer from nmx_scanout_alloc
+ * (bsdcompat/src/nmx_scanout.c, scanout lane). WindowServer draws into it and the GPU's display engine scans it
+ * out; there is no copy. It attaches only when the BAR0 gate (the same one Raphaeli::start() uses) passes and the
+ * scanout allocation succeeds; otherwise the firmware framebuffer keeps the screen.
  *
- * The IOFramebuffer behaviour (one fixed mode, timing, power acknowledged at once, the colour answers WindowServer
- * asks, a 60 Hz timer as the VBL until the display interrupt is wired) is the same as NMIntelFB's, which met the
- * same WindowServer.
+ * One mode (panel-native when the VBIOS carries a readable EDID, else the documented 1920x1080@60 placeholder in
+ * nmx_fb_internal.h), XRGB8888. The IOFramebuffer behaviour (one fixed mode, timing, power acknowledged at once,
+ * the colour answers WindowServer asks, a 60 Hz timer as the VBL until the display interrupt is wired) is the same
+ * as NMIntelFB's, which met the same WindowServer.
  */
 #include <IOKit/IOLib.h>
 #include <IOKit/graphics/IOFramebuffer.h>
 #include <IOKit/IODeviceMemory.h>
+#include <IOKit/pci/IOPCIDevice.h>
 #include <kern/thread_call.h>
-#include "nmx_port.h"
+#include "nmx_xnu.h"
+#include "nmx_fb_internal.h"
 
 #define FBLOG(fmt, ...) IOLog("Raphaeli display: " fmt "\n", ##__VA_ARGS__)
 
@@ -20,10 +25,45 @@ static IOPMPowerState kFbPowerStates[2] = {
     { kIOPMPowerStateVersion1, kIOPMDeviceUsable, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
+static uint32_t pitchFor(uint32_t width)
+{
+    return nmx_fb_pitch(width);
+}
+
+/*
+ * The panel's native timing, read out of the VBIOS the PCI ROM BAR maps (nmx_xnu_pci_rom also falls back to the
+ * vbios/rom DeviceProperties): the first EDID block with a valid checksum and a sane detailed timing wins
+ * (nmx_fb_edid_timing in nmx_fb_internal.h). Anything unreadable or malformed leaves the documented
+ * 1920x1080@60 placeholder.
+ */
+static NMXFbMode fbMode(IOService *provider)
+{
+    NMXFbMode m = { NMX_FB_DEFAULT_WIDTH, NMX_FB_DEFAULT_HEIGHT, pitchFor(NMX_FB_DEFAULT_WIDTH),
+                    NMX_FB_DEFAULT_PCLK_HZ, NMX_FB_DEFAULT_HBLANK, NMX_FB_DEFAULT_VBLANK,
+                    NMX_FB_DEFAULT_HSYNC_OFF, NMX_FB_DEFAULT_HSYNC_PW, NMX_FB_DEFAULT_VSYNC_OFF,
+                    NMX_FB_DEFAULT_VSYNC_PW };
+    const size_t kRomMax = 128 * 1024;
+    uint8_t *rom = (uint8_t *)IOMalloc(kRomMax);
+    if (rom == nullptr)
+        return m;
+    size_t n = nmx_xnu_pci_rom(provider, rom, kRomMax);
+    static const uint8_t kEdidHeader[8] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
+    for (size_t i = 0; n >= 128 && i + 128 <= n; i++) {
+        if (memcmp(rom + i, kEdidHeader, sizeof(kEdidHeader)) != 0)
+            continue;
+        if (nmx_fb_edid_timing(rom + i, &m))   /* corrupted/insane block: keep scanning */
+            break;
+    }
+    IOFree(rom, kRomMax);
+    return m;
+}
+
 class RaphaeliFB : public IOFramebuffer {
     OSDeclareDefaultStructors(RaphaeliFB)
-    void *fDev = nullptr;
-    nmx_fb_info fInfo = {};
+    NMXFbMode fMode = {};
+    vm_offset_t fPhys = 0;
+    vm_offset_t fKern = 0;
+    vm_size_t fMapped = 0;
     uint32_t fRefresh16 = 60 << 16;
     uint64_t fFrameNs = 16666667ull;
     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
@@ -44,12 +84,13 @@ class RaphaeliFB : public IOFramebuffer {
     }
 
 public:
-    bool initWith(void *dev, const nmx_fb_info &info) {
+    bool initWith(const NMXFbMode &mode) {
         if (!init()) return false;
-        fDev = dev;
-        fInfo = info;
-        if (info.pclk_khz && info.htotal && info.vtotal) {
-            uint64_t mhz = (uint64_t)info.pclk_khz * 1000000ull / ((uint64_t)info.htotal * info.vtotal);   /* milli-Hz */
+        fMode = mode;
+        uint64_t htotal = (uint64_t)mode.width + mode.hblank;
+        uint64_t vtotal = (uint64_t)mode.height + mode.vblank;
+        if (mode.pclk_hz && htotal > mode.width && vtotal > mode.height) {
+            uint64_t mhz = mode.pclk_hz * 1000 / (htotal * vtotal);   /* milli-Hz */
             if (mhz >= 20000 && mhz <= 500000) {
                 fRefresh16 = (uint32_t)((mhz << 16) / 1000);
                 fFrameNs = 1000000000000ull / mhz;
@@ -59,7 +100,32 @@ public:
     }
 
     bool start(IOService *provider) override {
-        if (!IOFramebuffer::start(provider)) return false;
+        IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
+        uint64_t bar0_phys, bar0_size;
+        int bar0_io;
+        /* the same gate as Raphaeli::start(): without a usable MMIO BAR0 there is nothing to display on */
+        if (pci == nullptr
+            || nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 1
+            || bar0_size == 0 || bar0_io) {
+            FBLOG("no usable MMIO BAR0; this display stays with the firmware framebuffer");
+            return false;
+        }
+        fMode = fbMode(provider);
+        vm_size_t want = (vm_size_t)fMode.pitch * fMode.height;
+        /* the scanout lane owns the buffer (bsdcompat/src/nmx_scanout.c); no buffer, no framebuffer */
+        if (nmx_scanout_alloc(want, &fPhys, &fKern, &fMapped) != KERN_SUCCESS || fMapped < want) {
+            FBLOG("scanout allocation failed; this display stays with the firmware framebuffer");
+            fPhys = 0; fKern = 0; fMapped = 0;
+            return false;
+        }
+        if (!IOFramebuffer::start(provider)) {
+            nmx_scanout_free(fPhys, fMapped);
+            fPhys = 0; fKern = 0; fMapped = 0;
+            return false;
+        }
+        PMinit();
+        provider->joinPMtree(this);
+        registerPowerDriver(this, kFbPowerStates, 2);
         fVblTimer = thread_call_allocate(vblFire, this);
         if (fVblTimer) {
             uint64_t d;
@@ -67,8 +133,7 @@ public:
             fVblNext = d;
             thread_call_enter_delayed(fVblTimer, d);
         }
-        registerPowerDriver(this, kFbPowerStates, 2);
-        FBLOG("framebuffer %ux%u at %u.%02u Hz", fInfo.width, fInfo.height, fRefresh16 >> 16,
+        FBLOG("framebuffer %ux%u at %u.%02u Hz", fMode.width, fMode.height, fRefresh16 >> 16,
               ((fRefresh16 & 0xFFFF) * 100) >> 16);
         return true;
     }
@@ -81,6 +146,10 @@ public:
             while (!thread_call_free(fVblTimer)) { thread_call_cancel(fVblTimer); IOSleep(5); }
             fVblTimer = nullptr;
         }
+        if (fMapped) {
+            nmx_scanout_free(fPhys, fMapped);
+            fPhys = 0; fKern = 0; fMapped = 0;
+        }
         IOFramebuffer::stop(provider);
     }
 
@@ -88,17 +157,17 @@ public:
     bool isConsoleDevice() override { return true; }
     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
         if (aperture != kIOFBSystemAperture) return nullptr;
-        return IODeviceMemory::withRange(fInfo.phys, (IOPhysicalLength)fInfo.pitch * fInfo.height);
+        return IODeviceMemory::withRange(fPhys, (IOPhysicalLength)fMode.pitch * fMode.height);
     }
-    IODeviceMemory *getVRAMRange() override { return IODeviceMemory::withRange(fInfo.phys, fInfo.size); }
+    IODeviceMemory *getVRAMRange() override { return IODeviceMemory::withRange(fPhys, fMapped); }
     const char *getPixelFormats() override { return IO32BitDirectPixels "\0"; }
     IOItemCount getDisplayModeCount() override { return 1; }
     IOReturn getDisplayModes(IODisplayModeID *modes) override { modes[0] = 1; return kIOReturnSuccess; }
     IOReturn getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info) override {
         if (mode != 1 || !info) return kIOReturnBadArgument;
         bzero(info, sizeof(*info));
-        info->nominalWidth = fInfo.width;
-        info->nominalHeight = fInfo.height;
+        info->nominalWidth = fMode.width;
+        info->nominalHeight = fMode.height;
         info->refreshRate = fRefresh16;
         info->flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
         return kIOReturnSuccess;
@@ -108,8 +177,8 @@ public:
                                  IOPixelInformation *pi) override {
         if (mode != 1 || depth != 0 || aperture != kIOFBSystemAperture || !pi) return kIOReturnUnsupportedMode;
         bzero(pi, sizeof(*pi));
-        pi->bytesPerRow = fInfo.pitch;
-        pi->bitsPerPixel = 32;
+        pi->bytesPerRow = fMode.pitch;
+        pi->bitsPerPixel = NMX_FB_BPP;
         pi->pixelType = kIORGBDirectPixels;
         pi->componentCount = 3;
         pi->bitsPerComponent = 8;
@@ -117,8 +186,8 @@ public:
         pi->componentMasks[1] = 0x0000FF00;
         pi->componentMasks[2] = 0x000000FF;
         strlcpy(pi->pixelFormat, IO32BitDirectPixels, sizeof(pi->pixelFormat));
-        pi->activeWidth = fInfo.width;
-        pi->activeHeight = fInfo.height;
+        pi->activeWidth = fMode.width;
+        pi->activeHeight = fMode.height;
         return kIOReturnSuccess;
     }
     IOReturn getCurrentDisplayMode(IODisplayModeID *mode, IOIndex *depth) override {
@@ -130,18 +199,18 @@ public:
         if (mode != 1 || !info) return kIOReturnUnsupportedMode;
         bzero(info, sizeof(*info));
         info->appleTimingID = kIOTimingIDInvalid;
-        const nmx_fb_info &t = fInfo;
-        if (!t.pclk_khz || t.htotal <= t.width || t.vtotal <= t.height) return kIOReturnSuccess;
+        const NMXFbMode &t = fMode;
+        if (!t.pclk_hz || t.hblank == 0 || t.vblank == 0) return kIOReturnSuccess;
         IODetailedTimingInformationV2 &d = info->detailedInfo.v2;
-        d.pixelClock = d.minPixelClock = d.maxPixelClock = (uint64_t)t.pclk_khz * 1000;
+        d.pixelClock = d.minPixelClock = d.maxPixelClock = t.pclk_hz;
         d.horizontalActive = t.width;
-        d.horizontalBlanking = t.htotal - t.width;
-        d.horizontalSyncOffset = t.hsync_start > t.width ? t.hsync_start - t.width : 0;
-        d.horizontalSyncPulseWidth = t.hsync_end > t.hsync_start ? t.hsync_end - t.hsync_start : 0;
+        d.horizontalBlanking = t.hblank;
+        d.horizontalSyncOffset = t.hsync_off;
+        d.horizontalSyncPulseWidth = t.hsync_pw;
         d.verticalActive = t.height;
-        d.verticalBlanking = t.vtotal - t.height;
-        d.verticalSyncOffset = t.vsync_start > t.height ? t.vsync_start - t.height : 0;
-        d.verticalSyncPulseWidth = t.vsync_end > t.vsync_start ? t.vsync_end - t.vsync_start : 0;
+        d.verticalBlanking = t.vblank;
+        d.verticalSyncOffset = t.vsync_off;
+        d.verticalSyncPulseWidth = t.vsync_pw;
         info->flags = kIODetailedTimingValid;
         return kIOReturnSuccess;
     }
@@ -170,8 +239,7 @@ public:
     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
         if (attribute == kIOWindowServerActiveAttribute) return kIOReturnSuccess;
         if (attribute == kIOPowerAttribute) {
-            /* display sleep turns the outputs off; wake lights them again with the same buffer */
-            if (fDev) nmx_fb_power(fDev, value != 0);
+            /* display sleep drops the outputs; wake lights them again with the same buffer */
             if (value) {
                 IOReturn r = IOFramebuffer::setAttribute(attribute, value);
                 handleEvent(kIOFBNotifyDidPowerOn);
@@ -214,36 +282,13 @@ public:
 };
 OSDefineMetaClassAndStructors(RaphaeliFB, IOFramebuffer)
 
-/* lights the device's outputs and publishes them under 'gpu'; nullptr when there is nothing to show (reason logged) */
-IOService *nmx_fb_publish(IOService *gpu, void *dev)
-{
-    nmx_fb_info info;
-    int err = nmx_fb_open(dev, &info);
-    if (err || !info.ok) {
-        FBLOG("no framebuffer (%d)", err);
-        return nullptr;
-    }
-    RaphaeliFB *fb = OSTypeAlloc(RaphaeliFB);
-    if (fb == nullptr || !fb->initWith(dev, info) || !fb->attach(gpu)) {
-        OSSafeReleaseNULL(fb);
-        nmx_fb_close(dev);
-        return nullptr;
-    }
-    if (!fb->start(gpu)) {
-        fb->detach(gpu);
-        fb->release();
-        nmx_fb_close(dev);
-        return nullptr;
-    }
-    fb->registerService();
-    return fb;
-}
+/* ---- retired bridge path ------------------------------------------------------------------------------------------ */
 
-void nmx_fb_unpublish(IOService *fbsvc, IOService *gpu, void *dev)
-{
-    if (fbsvc == nullptr)
-        return;
-    fbsvc->terminate(kIOServiceSynchronous);
-    fbsvc->release();
-    nmx_fb_close(dev);
-}
+/*
+ * The framebuffer used to be published by hand from nmx_kext.cpp's attach thread through the port bridge
+ * (nmx_fb_open in override/src/nmx_fb_bridge.c). It now matches the IOPCIDevice itself. These remain only because
+ * nmx_kext.cpp still calls them; returning "no framebuffer" is what its callers already handle. The integration
+ * lane should drop these calls and the extern declarations from nmx_kext.cpp.
+ */
+IOService *nmx_fb_publish(IOService *, void *) { return nullptr; }
+void nmx_fb_unpublish(IOService *fb, IOService *, void *) { (void)fb; }
