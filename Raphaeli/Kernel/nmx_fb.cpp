@@ -19,6 +19,10 @@
 #include <kern/thread_call.h>
 #include "nmx_xnu.h"
 #include "nmx_fb_internal.h"
+/* the display-engine bridge: plain C decls, so the C++ consumer supplies the linkage */
+extern "C" {
+#include "nmx_dm_bridge.h"
+}
 
 #define FBLOG(fmt, ...) IOLog("Raphaeli display: " fmt "\n", ##__VA_ARGS__)
 
@@ -76,6 +80,8 @@ class RaphaeliFB : public IOFramebuffer {
     vm_offset_t fPhys = 0;
     vm_offset_t fKern = 0;
     vm_size_t fMapped = 0;
+    IOPCIDevice *fPci = nullptr;   /* the display-engine bridge is per provider (nmx_dm_bridge.h) */
+    bool fDm = false;              /* the DC core answered nmx_dm_bridge_init: mode sets really program */
     uint32_t fRefresh16 = 60 << 16;
     uint64_t fFrameNs = 16666667ull;
     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
@@ -126,6 +132,7 @@ public:
             FBLOG("GPU not claimed by the Raphaeli driver - not starting");
             return false;
         }
+        fPci = pci;
         /* the same gate as Raphaeli::start(): without a usable MMIO BAR0 there is nothing to display on */
         if (nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 1
             || bar0_size == 0 || bar0_io) {
@@ -158,6 +165,22 @@ public:
             fVblNext = d;
             thread_call_enter_delayed(fVblTimer, d);
         }
+        /* the real display engine: verify the DC core the driver brought up and light the panel at the
+           startup timing right away (review P1-2: program the scanout, not just bookkeep). A refusal
+           here leaves the firmware timing on the panel; the first mode set then declines (below). */
+        int conns = nmx_dm_bridge_init(pci);
+        if (conns > 0) {
+            fDm = true;
+            uint64_t applied = 0;
+            int r = nmx_dm_bridge_set_mode(pci, 0, &fModes[0], fPhys, &applied);
+            if (r == 0)
+                FBLOG("display engine: %d connector(s), startup timing %ux%u programmed, scanout 0x%llx",
+                      conns, fModes[0].width, fModes[0].height, (unsigned long long)applied);
+            else
+                FBLOG("display engine: %d connector(s) but the startup timing was refused (%d); "
+                      "firmware timing stays until the first mode set", conns, r);
+        } else
+            FBLOG("display engine unavailable (%d); mode sets will decline rather than pretend", conns);
         FBLOG("%u display mode%s, %ux%u at %u.%02u Hz", fModeCount, fModeCount == 1 ? "" : "s",
               curMode().width, curMode().height, fRefresh16 >> 16, ((fRefresh16 & 0xFFFF) * 100) >> 16);
         return true;
@@ -253,12 +276,22 @@ public:
         uint32_t i = indexFor(mode);
         if (i >= fModeCount || depth != 0) return kIOReturnUnsupported;
         const NMXFbMode &m = fModes[i];
-        /* the display engine stays at the firmware timing; the scanout buffer only holds modes that fit it */
+        /* only modes the scanout buffer holds may be switched to */
         if ((vm_size_t)m.pitch * m.height > fBufSize) {
             FBLOG("mode %ux%u needs %u scanout bytes, only %u allocated; refusing", m.width, m.height,
                   (uint32_t)((vm_size_t)m.pitch * m.height), (uint32_t)fBufSize);
             return kIOReturnUnsupported;
         }
+        /* the mode change runs on the port's real display engine (nmx_dm_bridge.h); no engine or a
+           refusal declines instead of lying about a timing the panel never saw (review P1-2) */
+        uint64_t applied = 0;
+        int r = nmx_dm_bridge_set_mode(fPci, 0, &m, fPhys, &applied);
+        if (r != 0) {
+            FBLOG("mode %ux%u refused by the display engine (%d); the current timing stays", m.width,
+                  m.height, r);
+            return kIOReturnUnsupported;
+        }
+        FBLOG("mode %ux%u programmed, scanout 0x%llx", m.width, m.height, (unsigned long long)applied);
         fModeIndex = i;
         applyMode();
         return kIOReturnSuccess;

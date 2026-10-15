@@ -47,7 +47,11 @@ struct NMXFbMode {
     uint32_t hblank, vblank;
     uint32_t hsync_off, hsync_pw, vsync_off, vsync_pw;
     bool preferred;             /* EDID preferred-timing bit (byte 0x18 bit 1) on the first detailed timing */
+    /* sync shape the display engine must drive (detailed-timing byte 0x11: bit 7 interlace, bits 2/1
+       positive V/H sync; GTF: negative H, positive V, non-interlaced) */
+    bool interlace, positive_vsync, positive_hsync;
 };
+typedef struct NMXFbMode NMXFbMode;     /* the C side (nmx_dm_bridge.c) uses the bare name too */
 
 static inline uint32_t nmx_fb_pitch(uint32_t width)
 {
@@ -104,6 +108,9 @@ static inline bool nmx_fb_edid_dtd(const uint8_t *blk, const uint8_t *t, NMXFbMo
     m->hsync_pw = hsw;
     m->vsync_off = vso;
     m->vsync_pw = vsw;
+    m->interlace = (t[16] & 0x80) != 0;
+    m->positive_hsync = (t[16] & 0x02) != 0;
+    m->positive_vsync = (t[16] & 0x04) != 0;
     return true;
 }
 
@@ -146,8 +153,21 @@ static inline bool nmx_fb_gtf_timing(uint32_t width, uint32_t height, uint32_t v
     if (htotal > 16384 || vtotal > 16384 || !nmx_fb_mode_sane(pclk, hact, height, (uint32_t)hblank,
                                                               (uint32_t)(vtotal - height)))
         return false;
-    *m = NMXFbMode { hact, height, nmx_fb_pitch(hact), pclk, (uint32_t)hblank, (uint32_t)(vtotal - height),
-                     (uint32_t)(hblank / 2), (uint32_t)hsync, (uint32_t)(vsync_bp - VSYNC), VSYNC, false };
+    /* field by field: this header also compiles as C (nmx_dm_bridge.c), so no compound literals */
+    m->width = hact;
+    m->height = height;
+    m->pitch = nmx_fb_pitch(hact);
+    m->pclk_hz = pclk;
+    m->hblank = (uint32_t)hblank;
+    m->vblank = (uint32_t)(vtotal - height);
+    m->hsync_off = (uint32_t)(hblank / 2);
+    m->hsync_pw = (uint32_t)hsync;
+    m->vsync_off = (uint32_t)(vsync_bp - VSYNC);
+    m->vsync_pw = VSYNC;
+    m->preferred = false;
+    m->interlace = false;
+    m->positive_vsync = true;               /* drm_gtf_mode's polarity: -H +V */
+    m->positive_hsync = false;
     return true;
 }
 
