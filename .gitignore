@@ -1,0 +1,23 @@
+# Reference-only source trees (never commit)
+research/
+
+# Build workspaces and artifacts
+work-mesa/
+work-metalplugin/
+out/
+.ruff_cache/
+pi-session-*.html
+
+# Downloadable firmware blobs (re-fetch per fw/stage.sh)
+firmware/
+
+# Build outputs
+*.o
+*.o.tmp
+logs/
+logs-*/
+logs-rt/
+obj*/
+srcs*.txt
+npu-src/
+linux-6.14/

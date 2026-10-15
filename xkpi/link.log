@@ -1,0 +1,2 @@
+ld: warning: object file (/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libkmod.a[x86_64][2](c_start.o)) was built for newer 'macOS' version (26.2) than being linked (15.0)
+ld: warning: object file (/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libkmod.a[x86_64][3](c_stop.o)) was built for newer 'macOS' version (26.2) than being linked (15.0)

@@ -1,0 +1,25 @@
+xnu/nmx_devfs.cpp:50:22: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+   50 |     int node = minor(dev);
+      |                ~~~~~ ^~~
+xnu/nmx_devfs.cpp:87:19: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+   87 |     int m = minor(dev);
+      |             ~~~~~ ^~~
+xnu/nmx_devfs.cpp:102:19: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  102 |     int m = minor(dev);
+      |             ~~~~~ ^~~
+xnu/nmx_devfs.cpp:113:33: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  113 |     return nmx_cdev_ioctl(minor(dev), cmd, data, fflag);
+      |                           ~~~~~ ^~~
+xnu/nmx_devfs.cpp:130:35: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  130 |     int err = nmx_cdev_read(minor(dev), (uint64_t)base, (size_t)len, &done, (ioflag & IO_NDELAY) ? 1 : 0);
+      |                             ~~~~~ ^~~
+xnu/nmx_devfs.cpp:143:32: warning: implicit conversion changes signedness: 'dev_t' (aka 'int') to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  143 |     return nmx_cdev_poll(minor(dev), events) != 0;
+      |                          ~~~~~ ^~~
+xnu/nmx_devfs.cpp:210:54: warning: implicit conversion changes signedness: 'int' to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  210 |     void *h = devfs_make_node_clone(makedev(g_major, node), DEVFS_CHAR, uid, gid, mode, clone_minor, "%s", path);
+      |                                     ~~~~~~~          ^~~~
+xnu/nmx_devfs.cpp:210:45: warning: implicit conversion changes signedness: 'int' to '__uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  210 |     void *h = devfs_make_node_clone(makedev(g_major, node), DEVFS_CHAR, uid, gid, mode, clone_minor, "%s", path);
+      |                                     ~~~~~~~ ^~~~~~~
+8 warnings generated.
