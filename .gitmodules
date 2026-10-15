@@ -1,7 +1,9 @@
 [submodule "kpi/drm-kmod"]
 	path = kpi/drm-kmod
 	url = https://github.com/freebsd/drm-kmod.git
+	ignore = dirty
 [submodule "kpi/freebsd-src"]
 	shallow = true
 	path = kpi/freebsd-src
 	url = https://github.com/freebsd/freebsd-src.git
+	ignore = dirty
