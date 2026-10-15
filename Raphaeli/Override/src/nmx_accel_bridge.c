@@ -105,6 +105,59 @@ int nmx_accel_bridge_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uin
     return 0;
 }
 
+/*
+ * The memory plane: one pinned kernel GEM BO per vendor video-memory object (RaphaeliVidMemory),
+ * created with amdgpu's own kernel helper — the same shape the selftest's IB buffer uses. The BO is
+ * pinned, so its device address is stable; v0 stops there (no GPU page tables yet, so nothing maps
+ * these bytes into GPU VM — that is the next lane).
+ */
+int nmx_accel_bridge_alloc(uint64_t size, uint64_t align, uint32_t domain, uint64_t *bo_out,
+                           uint64_t *gpu_addr_out, void **cpu_out)
+{
+    if (bo_out)
+        *bo_out = 0;
+    if (gpu_addr_out)
+        *gpu_addr_out = 0;
+    if (cpu_out)
+        *cpu_out = NULL;
+    if (size == 0 || bo_out == NULL)
+        return -EINVAL;
+    struct amdgpu_device *adev = g_iopci != NULL ? adev_of(g_iopci) : NULL;
+    if (adev == NULL || !adev->accel_working)
+        return -ENODEV;
+    if (adev->in_suspend || adev->shutdown)
+        return -EBUSY;
+    struct amdgpu_bo *bo = NULL;
+    u64 addr = 0;
+    void *cpu = NULL;
+    int r = amdgpu_bo_create_kernel(adev, size, align != 0 ? (int)align : 4096, domain, &bo, &addr, &cpu);
+    if (r)
+        return r;
+    *bo_out = (uint64_t)(uintptr_t)bo;
+    if (gpu_addr_out)
+        *gpu_addr_out = addr;
+    if (cpu_out)
+        *cpu_out = cpu;
+    return 0;
+}
+
+uint64_t nmx_accel_bridge_dmap(uint64_t bo)
+{
+    struct amdgpu_bo *b = (struct amdgpu_bo *)(uintptr_t)bo;
+    if (b == NULL)
+        return 0;
+    return amdgpu_bo_gpu_offset(b);
+}
+
+void nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu)
+{
+    struct amdgpu_bo *b = (struct amdgpu_bo *)(uintptr_t)bo;
+    if (b == NULL)
+        return;
+    u64 addr = gpu_addr;
+    amdgpu_bo_free_kernel(&b, &addr, &cpu);
+}
+
 int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
 {
     struct dma_fence *f = (struct dma_fence *)(uintptr_t)fence;
@@ -153,6 +206,23 @@ int nmx_accel_selftest(void)
         printf("Raphaeli accel selftest: gfx ring 0 NOP IB submitted, fence %s (0x%x)\n",
                kr == KERN_SUCCESS ? "signaled: PASS" : "NOT signaled: FAIL", kr);
         r = kr == KERN_SUCCESS ? 0 : -1;
+    }
+    /* the memory plane: one pinned VRAM BO through the bridge the vendor vid memory uses (v2) */
+    {
+        uint64_t bo = 0, vaddr = 0;
+        void *kva = NULL;
+        int m = nmx_accel_bridge_alloc(4096, 4096, AMDGPU_GEM_DOMAIN_VRAM, &bo, &vaddr, &kva);
+        if (m == 0 && bo != 0 && vaddr != 0) {
+            uint64_t off = nmx_accel_bridge_dmap(bo);
+            nmx_accel_bridge_free(bo, vaddr, kva);
+            printf("Raphaeli accel selftest: VRAM alloc 4096 B, device address 0x%llx: %s\n",
+                   (unsigned long long)off, off != 0 ? "PASS" : "FAIL (no device address)");
+            if (off == 0)
+                r = -1;
+        } else {
+            printf("Raphaeli accel selftest: VRAM alloc refused (%d): FAIL\n", m);
+            r = -1;
+        }
     }
     amdgpu_bo_free_kernel(&bo, &gpu_addr, &cpu);
     return r;

@@ -7,6 +7,7 @@
  * Nothing here executes GPU work; unknown family input reaches only these virtuals, none of which can panic.
  */
 #include "nmx_accel.h"
+#include "nmx_port.h"
 
 static inline bool uc_log_sample(unsigned &seen, unsigned first)
 {
@@ -57,23 +58,9 @@ bool RaphaeliDisplayMachine::displayModeWillChange() { return true; }
 bool RaphaeliDisplayMachine::displayModeDidChange() { return true; }
 OSDefineMetaClassAndStructors(RaphaeliDisplayMachine, IOAccelLegacyDisplayMachine)
 
-/* ---- GPU VA task: v0 hands out addresses from a local range allocator with no page tables behind them ---------- */
+/* ---- GPU VA task: the family owns the class; task accounting (VA allocators + family registration) is done
+   in RaphaeliAccel::createUserGPUTask, exactly like the proven reference driver's newGPUTask ------------- */
 
-unsigned long long RaphaeliTask::allocate(const IOAccelMemoryMap *map)
-{
-    static unsigned n;
-    if (uc_log_sample(n, 8))
-        ACCELLOG("task allocate %llu bytes (align %llu) - fake VA, no page tables (v0)",
-                 map ? map->getLength() : 0ull, 4096ull);
-    /* no allocator wired: refusing keeps every later mapping honest instead of colliding fake VAs */
-    return 0;
-}
-
-void RaphaeliTask::deallocate(const IOAccelMemoryMap *map, unsigned long long addr)
-{
-    static unsigned n;
-    if (uc_log_sample(n, 8)) ACCELLOG("task deallocate 0x%llx - v0, ignored", (unsigned long long)addr);
-}
 OSDefineMetaClassAndStructors(RaphaeliTask, IOAccelTask)
 
 /* ---- memory map: the family's GART hook; v0 has no page tables, so nothing ever maps ---------------------------- */
@@ -127,19 +114,56 @@ OSDefineMetaClassAndStructors(RaphaeliResource, IOAccelResource2)
 
 OSDefineMetaClassAndStructors(RaphaeliSysMemory, IOAccelSysMemory)
 
-/* ---- vid memory: allocation is the amdgpu VRAM allocator's job; no bridge yet, so every allocation refuses ------ */
+/* ---- vid memory: real VRAM through the bridge (Override/src/nmx_accel_bridge.c: amdgpu's own kernel GEM
+   helper). The object is backed by one pinned GEM BO; the device address is what getPhysicalSegment hands
+   out. No GPU page tables exist yet, so the map-side commit still refuses — allocations are real, GPU VM is
+   the next lane. Geometry comes from the family's ivars: length at +0x40, phys slot at +0xc8 (reference). */
 
 bool RaphaeliVidMemory::allocPhysical()
 {
     static unsigned n;
-    if (uc_log_sample(n, 8)) ACCELLOG("vid memory allocPhysical REFUSED - no VRAM bridge (v0)");
-    return false;
+    const unsigned long long want = *(const volatile unsigned long long *)((const unsigned char *)this + 0x40);
+    if (!want)
+        return false;
+    if (fBo) {   /* already backed: AMD's own shape (false when re-allocating a live allocation) */
+        if (uc_log_sample(n, 8)) ACCELLOG("vid memory allocPhysical(%p): already backed by %llu bytes", this, fBytes);
+        return false;
+    }
+    uint64_t bo = 0, addr = 0;
+    void *cpu = nullptr;
+    int r = nmx_accel_bridge_alloc(want, 4096, 4 /* AMDGPU_GEM_DOMAIN_VRAM */, &bo, &addr, &cpu);
+    if (r) {
+        if (uc_log_sample(n, 8)) ACCELLOG("vid memory allocPhysical(%p): %llu bytes refused by the bridge (%d)", this, want, r);
+        return false;
+    }
+    fBo = bo;
+    fPhys = nmx_accel_bridge_dmap(bo);
+    fBytes = want;
+    *(volatile unsigned long long *)((unsigned char *)this + 0xc8) = fPhys;   /* the family's phys slot */
+    if (uc_log_sample(n, 8))
+        ACCELLOG("vid memory allocPhysical(%p): %llu bytes of REAL VRAM - device address 0x%llx (cpu %p)",
+                 this, fBytes, (unsigned long long)fPhys, cpu);
+    return fPhys != 0;
 }
-void RaphaeliVidMemory::deallocPhysical() {}
-uint64_t RaphaeliVidMemory::getPhysicalSegment(unsigned long long, unsigned long long *len)
+
+void RaphaeliVidMemory::deallocPhysical()
+{
+    static unsigned n;
+    if (!fBo)
+        return;
+    if (uc_log_sample(n, 8)) ACCELLOG("vid memory deallocPhysical(%p): releasing %llu bytes", this, fBytes);
+    nmx_accel_bridge_free(fBo, fPhys, nullptr);
+    fBo = fPhys = fBytes = 0;
+    *(volatile unsigned long long *)((unsigned char *)this + 0xc8) = 0;
+}
+
+uint64_t RaphaeliVidMemory::getPhysicalSegment(unsigned long long offset, unsigned long long *len)
 {
     if (len) *len = 0;
-    return 0;
+    if (!fPhys || offset >= fBytes)
+        return 0;
+    if (len) *len = fBytes - offset;
+    return fPhys + offset;
 }
 OSDefineMetaClassAndStructors(RaphaeliVidMemory, IOAccelVidMemory)
 
@@ -198,9 +222,3 @@ OSDefineMetaClassAndStructors(Raphaeli2DContext, IOAccel2DContext2)
 
 OSDefineMetaClassAndStructors(RaphaeliCLContext, IOAccelCLContext2)
 OSDefineMetaClassAndStructors(RaphaeliVideoContext, IOAccelVideoContext2)
-
-OSObject *raphaeli_accel_new_task()
-{
-    RaphaeliTask *t = OSTypeAlloc(RaphaeliTask);
-    return t;
-}

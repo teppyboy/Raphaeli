@@ -21,6 +21,15 @@ int nmx_port_shutdown(void *dev);
 void nmx_accel_bridge_device(void *iopci);
 int nmx_accel_bridge_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out);
 int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms);
+/* the accel lane's memory bridge (Override/src/nmx_accel_bridge.c): real amdgpu GEM backing for the
+   accelerator's vendor video memory (RaphaeliVidMemory). alloc pins one kernel BO of 'size' bytes in
+   'domain' (AMDGPU_GEM_DOMAIN_*: 2 = GTT, 4 = VRAM) and returns an opaque handle plus its device
+   address and kernel mapping; dmap re-reads the device address; free releases it. Results are 0 or a
+   negative errno; handles are held by the caller and must be freed exactly once. */
+int nmx_accel_bridge_alloc(uint64_t size, uint64_t align, uint32_t domain, uint64_t *bo_out,
+                           uint64_t *gpu_addr_out, void **cpu_out);
+uint64_t nmx_accel_bridge_dmap(uint64_t bo);
+void nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu);
 /* boot-arg selftest (raphaeli-accel-test=1): one trivial IB through the hooks, fence completion logged */
 int nmx_accel_selftest(void);
 

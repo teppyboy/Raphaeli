@@ -63,6 +63,7 @@ extern "C" kern_return_t nmx_xnu_accel_fence_wait(uint64_t fence, uint32_t timeo
 
 RaphaeliAccel *RaphaeliAccel::gAccel = nullptr;
 
+
 IOService *RaphaeliAccel::probe(IOService *provider, SInt32 *score)
 {
     IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
@@ -104,12 +105,22 @@ void RaphaeliAccel::stop(IOService *provider)
         fStamps->release();
         fStamps = nullptr;
     }
+    /* the client-task VA allocators: the family dropped its references with its tasks; ours are last */
+    for (unsigned i = 0; i < RaphaeliAccel::kTaskRanges; i++) {
+        if (fRanges[i]) {
+            fRanges[i]->release();
+            fRanges[i] = nullptr;
+        }
+    }
     IOGraphicsAccelerator2::stop(provider);
 }
 
 uint64_t RaphaeliAccel::getStampMemory(unsigned int *pageBytes)
 {
-    /* one contiguous page of event stamps; the event machine writes them in writeStamp */
+    /* one contiguous page of event stamps; the event machine writes them in writeStamp. The family maps
+       this descriptor into the client task itself when it answers get_event_machine (sel 2) — the
+       reference-proven shape, unchanged. */
+    static unsigned stamps;
     if (fStamps == nullptr) {
         fStamps = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task, kIODirectionInOut | kIOMemoryPhysicallyContiguous,
                                                               16384, 4096);
@@ -119,6 +130,9 @@ uint64_t RaphaeliAccel::getStampMemory(unsigned int *pageBytes)
         } else
             ACCELLOG("getStampMemory: no contiguous stamp page");
     }
+    if (accel_log_sample(stamps, 4))
+        ACCELLOG("getStampMemory -> descriptor %p (%s), pageBytes %u", fStamps,
+                 fStamps ? "16 KB, 4096 stamps" : "NONE", fStamps ? 4096u : 0u);
     if (pageBytes)
         *pageBytes = fStamps ? 4096 : 0;
     return (uint64_t)(uintptr_t)fStamps;
@@ -130,8 +144,41 @@ OSObject *RaphaeliAccel::newEventMachine()
     return m;
 }
 
-OSObject *RaphaeliAccel::createUserGPUTask()  { return raphaeli_accel_new_task(); }
-OSObject *RaphaeliAccel::createKernelGPUTask() { return raphaeli_accel_new_task(); }
+#define RAPHAELI_TASK_RANGES RaphaeliAccel::kTaskRanges
+IORangeAllocator *RaphaeliAccel::fRanges[RaphaeliAccel::kTaskRanges] = {};
+
+OSObject *RaphaeliAccel::createTask(const char *who)
+{
+    /* the first free slot becomes this client task's VA allocator; the first 1 MB of each space is
+       reserved for vendor-private descriptors (the reference driver's proven shape). The family
+       retains the allocator in IOAccelTask::init, so the accelerator's reference is dropped there. */
+    IORangeAllocator **slot = nullptr;
+    for (unsigned i = 0; i < RAPHAELI_TASK_RANGES && !slot; i++)
+        if (!fRanges[i]) {
+            IORangeAllocator *va = IORangeAllocator::withRange(1ULL << 40, 4096);
+            if (va && !va->allocateRange(0, 0x100000)) {
+                va->release();
+                va = nullptr;
+            }
+            if (va) {
+                fRanges[i] = va;
+                slot = &fRanges[i];
+            }
+        }
+    RaphaeliTask *t = OSTypeAlloc(RaphaeliTask);
+    bool ok = t && slot && t->init(this, 1, slot);
+    if (slot && ok)
+        (*slot)->release();   /* the family holds its own reference now */
+    ACCELLOG("%s -> %p (VA allocator %p, init %s)", who, t, slot ? (void *)*slot : nullptr, ok ? "ok" : "FAILED");
+    if (t && !ok) {
+        t->release();
+        t = nullptr;
+    }
+    return t;
+}
+
+OSObject *RaphaeliAccel::createUserGPUTask()  { return createTask("createUserGPUTask"); }
+OSObject *RaphaeliAccel::createKernelGPUTask() { return createTask("createKernelGPUTask"); }
 
 void RaphaeliAccel::populateAccelConfig(IOAccelConfig *config)
 {

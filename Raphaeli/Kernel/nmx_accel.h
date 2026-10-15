@@ -49,6 +49,11 @@ class RaphaeliAccel : public IOGraphicsAccelerator2 {
 public:
     static RaphaeliAccel *gAccel;
     IOBufferMemoryDescriptor *fStamps = nullptr;
+    /* per-client GPU VA task accounting: one IORangeAllocator per client task, handed to the family
+       in IOAccelTask::init (which retains it); released here in stop() as the last owner */
+    static constexpr unsigned kTaskRanges = 32;
+    static IORangeAllocator *fRanges[kTaskRanges];
+    OSObject *createTask(const char *who);
     uint64_t  getStampMemory(unsigned int *pageBytes) APPLE_KEXT_OVERRIDE;
     OSObject *newEventMachine() APPLE_KEXT_OVERRIDE;
     OSObject *createUserGPUTask() APPLE_KEXT_OVERRIDE;
@@ -71,8 +76,6 @@ public:
     bool      start(IOService *provider) APPLE_KEXT_OVERRIDE;
     void      stop(IOService *provider) APPLE_KEXT_OVERRIDE;
 };
-OSObject *raphaeli_accel_new_task(void);        /* nmx_accel_uc.cpp: one IOAccelTask (VA space) */
-
 /* nmx_accel_uc.cpp — the objects the family's factories ask for */
 class RaphaeliEventMachine : public IOAccelEventMachineFast2 {
     OSDeclareDefaultStructors(RaphaeliEventMachine)
@@ -93,9 +96,9 @@ public:
 };
 class RaphaeliTask : public IOAccelTask {
     OSDeclareDefaultStructors(RaphaeliTask)
-public:
-    unsigned long long allocate(const IOAccelMemoryMap *map) APPLE_KEXT_OVERRIDE;
-    void deallocate(const IOAccelMemoryMap *map, unsigned long long addr) APPLE_KEXT_OVERRIDE;
+    /* no vendor overrides: the family's own IOAccelTask (init/allocate/freeAllGPUMappings) does the
+       task accounting from the IORangeAllocator** RaphaeliAccel hands it; GPU VM stays refused in the
+       map (no page tables yet) */
 };
 class RaphaeliMemoryMap : public IOAccelMemoryMap {
     OSDeclareDefaultStructors(RaphaeliMemoryMap)
@@ -124,6 +127,9 @@ public:
     bool allocPhysical() APPLE_KEXT_OVERRIDE;
     void deallocPhysical() APPLE_KEXT_OVERRIDE;
     uint64_t getPhysicalSegment(unsigned long long offset, unsigned long long *len) APPLE_KEXT_OVERRIDE;
+    uint64_t fBo = 0;      /* the bridge's pinned GEM BO (opaque handle, freed exactly once) */
+    uint64_t fPhys = 0;    /* its stable device address */
+    uint64_t fBytes = 0;
 };
 class RaphaeliSurface : public IOAccelLegacySurface {
     OSDeclareDefaultStructors(RaphaeliSurface)
