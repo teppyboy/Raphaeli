@@ -15,6 +15,15 @@ void nmx_port_detach(void *dev);
 int nmx_port_power(void *dev, int on);
 int nmx_port_shutdown(void *dev);
 
+/* the accel lane's ring/fence bridge (Override/src/nmx_accel_bridge.c): the kext registers the GPU once its
+   driver attached it; the accel contract's hooks (Kernel/nmx_accel.cpp) then submit kernel-internal IBs on its
+   gfx rings and wait on the emitted dma_fences. Bridge results are 0 or a negative errno. */
+void nmx_accel_bridge_device(void *iopci);
+int nmx_accel_bridge_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out);
+int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms);
+/* boot-arg selftest (raphaeli-accel-test=1): one trivial IB through the hooks, fence completion logged */
+int nmx_accel_selftest(void);
+
 /* the display bridge (override/src/nmx_fb_bridge.c): one scan-out buffer on every lit output of the device */
 struct nmx_fb_info {
     int ok;

@@ -243,6 +243,10 @@ void Raphaeli::attachNow()
     IOLog("Raphaeli GPU: driving %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
           pci_->configRead16(kIOPCIConfigDeviceID));
     OSSynchronizeIO();
+    /* the accel ring bridge serves the driver that just attached (nmx_accel_bridge.c); the boot-arg
+       selftest (raphaeli-accel-test=1) then pushes one trivial IB through the hooks and waits on it */
+    nmx_accel_bridge_device(pci_);
+    nmx_accel_selftest();
     attach_ = 1;
 }
 

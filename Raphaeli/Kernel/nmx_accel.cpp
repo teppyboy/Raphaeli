@@ -5,10 +5,13 @@
  * the family binary owns the user-client classes and their selector dispatch; this file only answers the
  * family's factory and config hooks. The vendor objects live in nmx_accel_uc.cpp.
  *
- * v0: opens succeed, everything else is logged and refused honestly — no VRAM allocator, no GPU page tables,
- * no ring bridge yet (see nmx_xnu_accel_ring_submit below).
+ * v1: opens succeed, everything else is logged and refused honestly — the accel UC objects still own no
+ * VRAM allocator and no GPU page tables (the amdgpu driver does); the submit hooks below are wired to its
+ * real gfx-ring/fence path (nmx_accel_bridge.c) and are the reusable core until the protocol mapping is proven.
  */
 #include "nmx_accel.h"
+#include "nmx_port.h"
+#include <sys/errno.h>
 #include <IOKit/pci/IOPCIDevice.h>
 
 #define AMD_VENDOR 0x1002
@@ -21,26 +24,39 @@ static inline bool accel_log_sample(unsigned &seen, unsigned first)
     return n < first || (n & 1023) == 0;
 }
 
-/* ---- the lane contract's submit hooks (v0: log + refuse; the amdgpu ring bridge lands with the C-side path) --- */
+/* ---- the lane contract's submit hooks (v1: real amdgpu path via Override/src/nmx_accel_bridge.c) ------- */
+
+/* errors map to KERN_*; the bridge logs its own details, this side logs the contract surface */
+static inline kern_return_t accel_bridge_result(int r)
+{
+    if (r == 0)
+        return KERN_SUCCESS;
+    if (r == -ETIME)
+        return KERN_OPERATION_TIMED_OUT;
+    return KERN_NOT_SUPPORTED;
+}
 
 extern "C" kern_return_t nmx_xnu_accel_ring_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out)
 {
     static unsigned submits;
-    if (accel_log_sample(submits, 8))
-        ACCELLOG("ring_submit: ring %u ib 0x%llx (%u dw) REFUSED - no ring bridge yet (v0)", ring,
-                 (unsigned long long)ib_addr, ib_dw);
     if (fence_out)
         *fence_out = 0;
-    return KERN_NOT_SUPPORTED;
+    int r = nmx_accel_bridge_submit(ring, ib_addr, ib_dw, fence_out);
+    if (accel_log_sample(submits, 8))
+        ACCELLOG("ring_submit: ring %u ib 0x%llx (%u dw) -> 0x%x (%d)", ring,
+                 (unsigned long long)ib_addr, ib_dw,
+                 accel_bridge_result(r), r);
+    return accel_bridge_result(r);
 }
 
 extern "C" kern_return_t nmx_xnu_accel_fence_wait(uint64_t fence, uint32_t timeout_ms)
 {
     static unsigned waits;
+    int r = nmx_accel_bridge_fence_wait(fence, timeout_ms);
     if (accel_log_sample(waits, 8))
-        ACCELLOG("fence_wait: fence %llu %u ms REFUSED - no fence bridge yet (v0)",
-                 (unsigned long long)fence, timeout_ms);
-    return KERN_NOT_SUPPORTED;
+        ACCELLOG("fence_wait: fence %llu %u ms -> 0x%x (%d)",
+                 (unsigned long long)fence, timeout_ms, accel_bridge_result(r), r);
+    return accel_bridge_result(r);
 }
 
 /* ---- the accelerator nub -------------------------------------------------------------------------------------- */

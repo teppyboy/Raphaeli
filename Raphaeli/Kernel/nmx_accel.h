@@ -33,9 +33,10 @@
 #include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVideoContext2.h"
 
 /*
- * The accel submit hooks of the lane contract (v0): the log-and-refuse surface every accel-side submit goes
- * through until a real amdgpu ring bridge exists (the RADV path, drm_ioctl -> amdgpu_cs_ioctl, is not callable
- * from this IOKit-side TU). Unknown input never panics; both return KERN_UNSUPPORTED with the op logged.
+ * The accel submit hooks of the lane contract (v1): the family-side surface every accel-side submit goes
+ * through; nmx_accel_bridge.c (Override/src, behind nmx_port.h) runs each one on the amdgpu driver's real
+ * ring/fence path — a kernel-internal IB schedule on a gfx ring, dma_fence_wait_timeout for waits. Unknown
+ * input never panics; an uninitialized/suspended/detached device maps to KERN_NOT_SUPPORTED.
  */
 extern "C" {
 kern_return_t nmx_xnu_accel_ring_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out);
