@@ -45,3 +45,5 @@ __pycache__/
 # macOS / caches
 .DS_Store
 .cache/
+# legacy remnant (root-owned artifact inside; remove with sudo)
+xkpi/
