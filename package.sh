@@ -9,13 +9,16 @@ ARCH=x86_64
 NAME="Raphaeli-$VERSION-$ARCH"
 STAGE="dist/$NAME"
 
-[ -d xkpi/out/Raphaeli.kext ] || { echo "missing xkpi/out/Raphaeli.kext - run xkpi/link.sh first" >&2; exit 1; }
+# Kext source dir override: RAPHAELI_KEXT=<dir> ./package.sh — needed when xkpi/out/Raphaeli.kext is
+# root:wheel (post-chown for kmutil) and a fresh user-owned link lives elsewhere (e.g. xkpi/out-disp).
+KEXT=${RAPHAELI_KEXT:-xkpi/out/Raphaeli.kext}
+[ -d "$KEXT" ] || { echo "missing $KEXT - run xkpi/link.sh first" >&2; exit 1; }
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE"/{kext,usr/lib,firmware/amdgpu,tools/fw}
 
-ditto xkpi/out/Raphaeli.kext "$STAGE/kext/Raphaeli.kext"
+ditto "$KEXT" "$STAGE/kext/Raphaeli.kext"
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"

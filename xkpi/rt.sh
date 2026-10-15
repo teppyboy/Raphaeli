@@ -21,7 +21,7 @@ done
 CK=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/kpi/freebsd-src/sys/contrib/ck/src
 n=$((n + 1))
 ./cclk.sh "$CK/ck_epoch.c" > lklogs/ck_epoch.log 2>&1 || { echo "LK FAIL ck_epoch"; fail=$((fail + 1)); }
-for f in bsdcompat/src/*.c; do
+for f in bsdcompat/src/*.c override/display/*.c; do
     b=$(basename "$f" .c); n=$((n + 1))
     ./ccsrc.sh "$f" > "srclog_$b.txt" 2>&1 || { echo "SRC FAIL $b"; fail=$((fail + 1)); }
 done

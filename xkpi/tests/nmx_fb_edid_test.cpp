@@ -1,10 +1,7 @@
 /*
  * Host-side self-check for nmx_fb_edid_timing (nmx_fb_internal.h): real EDID byte layouts, assert-based.
- * Not part of the kext (nothing links it); built and run by hand: clang++ -std=c++17 nmx_fb_edid_test.cpp && ./a.out
- * rt.sh also compiles every xnu cpp file with ccxx.sh (-DAPPLE, -nostdinc, no libc): under that the TU compiles empty.
+ * Not part of the kext (nothing links it; lives outside xnu/ so the kernel-flag glob never sees it); built and run by hand: clang++ -std=c++17 -I xnu tests/nmx_fb_edid_test.cpp && ./a.out
  */
-#ifdef APPLE
-#else
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -78,4 +75,3 @@ int main()
     printf("nmx_fb_edid_test: all checks passed\n");
     return 0;
 }
-#endif
