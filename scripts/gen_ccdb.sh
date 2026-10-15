@@ -31,6 +31,11 @@ xnuflags = ["-arch", "x86_64", "-mmacosx-version-min=15.0", "-mkernel", "-fapple
             "-Wall", "-Wno-unused-parameter", "-Wno-deprecated-declarations", "-Wno-inconsistent-missing-override"]
 for f in sorted(glob.glob(root + "/Raphaeli/Kernel/*.cpp")):
     entries.append({"directory": root, "file": f, "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++"] + xnuflags + ["-c", f]})
+# host-side selftest (scripts/tests/): plain libc++ host build, not a kernel TU
+selftest = root + "/scripts/tests/nmx_fb_edid_test.cpp"
+if os.path.isfile(selftest):
+    entries.append({"directory": root, "file": selftest,
+                    "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++", "-std=c++17", "-isysroot", sdk, "-I", root + "/Raphaeli/Kernel", "-c", selftest]})
 pathlib.Path(root + "/compile_commands.json").write_text(json.dumps(entries, indent=1))
 print("entries:", len(entries))
 EOF

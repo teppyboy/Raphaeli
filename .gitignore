@@ -2,13 +2,15 @@
 research/
 
 # Build workspaces and artifacts
-work-mesa/
-work-metalplugin/
+work-*/
 out/
+out-disp/
+out-p12/
+dist/
 .ruff_cache/
 pi-session-*.html
 
-# Downloadable firmware blobs (re-fetch per fw/stage.sh)
+# Downloadable firmware blobs (re-fetch per Raphaeli/Firmware/stage.sh)
 firmware/
 
 # Build outputs
@@ -16,18 +18,30 @@ firmware/
 *.o.tmp
 logs/
 logs-*/
-logs-rt/
+lklogs/
 obj*/
+srcobj/
+xnuobj/
+lkobj/
 srcs*.txt
+*.all
+srclog_*.txt
+xlog_*.txt
+rank*.txt
+*.log
+xe-src/
+obj-npu*
 npu-src/
 linux-6.14/
-dist/
+i915
+
+# Generated
+compile_commands.json
 
 # Python
+__pycache__/
 *.pyc
 
-# macOS
-.cache/
+# macOS / caches
 .DS_Store
 .cache/
-out-disp/

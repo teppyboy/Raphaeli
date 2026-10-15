@@ -1,6 +1,6 @@
 /*
  * Host-side self-check for nmx_fb_edid_timing (nmx_fb_internal.h): real EDID byte layouts, assert-based.
- * Not part of the kext (nothing links it; lives outside xnu/ so the kernel-flag glob never sees it); built and run by hand: clang++ -std=c++17 -I xnu tests/nmx_fb_edid_test.cpp && ./a.out
+ * Not part of the kext (nothing links it; lives outside Kernel/ so the kernel-flag glob never sees it); built and run by hand: clang++ -std=c++17 -I Raphaeli/Kernel scripts/tests/nmx_fb_edid_test.cpp && ./a.out
  */
 #include <assert.h>
 #include <string.h>
