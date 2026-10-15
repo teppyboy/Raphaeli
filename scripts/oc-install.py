@@ -54,7 +54,13 @@ from datetime import datetime
 from typing import Any, NoReturn
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FW_STAGE_SH = os.path.join(SCRIPT_DIR, "..", "Raphaeli", "Firmware", "stage.sh")
+# stage.sh lives next to us in the dist zip (tools/fw/stage.sh) or in the dev
+# tree (Raphaeli/Firmware/stage.sh)
+_FW_CANDIDATES = (
+    os.path.join(SCRIPT_DIR, "fw", "stage.sh"),
+    os.path.join(SCRIPT_DIR, "..", "Raphaeli", "Firmware", "stage.sh"),
+)
+FW_STAGE_SH = next((p for p in _FW_CANDIDATES if os.path.isfile(p)), _FW_CANDIDATES[0])
 GUID = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
 BOOT_ARG = "raphaeli-amd=1"
 KEXT_NAME = "Raphaeli.kext"
