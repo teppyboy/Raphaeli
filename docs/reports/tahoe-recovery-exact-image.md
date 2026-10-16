@@ -108,6 +108,24 @@ ordering, unchanged NVRAM, backup fidelity, existing-entry refusal, build/UUID/
 version mismatch, copy failure, and config replacement rollback. Actual dry-run
 and apply exercised only in `/tmp/raphaeli-exact-staging*`, never real EFI.
 
+## Full OpenCore configuration processing
+
+Built OpenCorePkg `Utilities/ocvalidate` and `Utilities/TestProcessKernel` at
+`81ecf1a`, with AUDK headers and DEBUG userspace libraries. Generated the
+sample 1.0.9 config with staged entries and the current Raphaeli bundle in a
+temporary EFI directory (`/tmp/raphaeli-exact-staging/EFI/OC`).
+
+- `ocvalidate <temp-OC>/config.plist`: exit 0, no issues.
+- `ProcessKernel <temp-OC>/ <exact-Recovery-BootKC>`: exit 0.
+- Logs explicitly report injection `Success` for IOGraphicsFamily,
+  IOAcceleratorFamily2, and Raphaeli, in that order; prelinked status Success.
+- Scratch output/log: `/tmp/raphaeli-full-process-72/`.
+
+This exercises config parsing, executable-path resolution, reservation, kernel
+version matching, ordered injection and full prelink completion, not just the
+standalone kext injection API. It still does not boot a kernel, load the second
+KC, or validate the user's other OC patches/personality configuration.
+
 ## What remains unproven
 
 This is an **injection-tested experiment**, not a production-ready fix or GPU
