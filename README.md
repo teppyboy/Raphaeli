@@ -7,7 +7,7 @@ An experimental AMD Phoenix (RDNA 3) GPU driver for macOS.
 
 ### How does this driver work?
 
-Kind of the architecture as [nullmoth/nvidia-macos-driver](https://github.com/nullmoth/nvidia-macos-driver), tl;dr is below:
+Kind of the same architecture as [nullmoth/nvidia-macos-driver](https://github.com/nullmoth/nvidia-macos-driver), tl;dr see below:
 
 ```
 Metal apps → Metal plugin → AIR→SPIR-V (metal2vulkan) → RADV → libdrm → Raphaeli.kext (amdgpu port) → GPU
