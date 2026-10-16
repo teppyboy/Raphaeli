@@ -4,12 +4,17 @@ Guidance for AI coding agents working on Raphaeli.
 
 ## What this project is
 
-AMD Radeon 780M (Phoenix, gfx1103, PCI `0x15bf`) macOS kernel driver: the
-`amdgpu` port (FreeBSD drm-kmod LinuxKPI → XNU), a DCN display path, an
-IOFramebuffer (`RaphaeliFB`), IOAcceleratorFamily2 glue (`RaphaeliAccel`), and
-Mesa RADV userspace. Dev host = x86_64 macOS 15.7.8 Hackintosh, AMFI + Secure
-Boot disabled (no kext signing needed), SIP custom. The target 780M machine is
-elsewhere — hardware behavior is unverified here.
+A macOS kernel driver for AMD Phoenix APUs (gfx1103 family): the `amdgpu` port
+(FreeBSD drm-kmod LinuxKPI → XNU), a DCN display path, an IOFramebuffer
+(`RaphaeliFB`), IOAcceleratorFamily2 glue (`RaphaeliAccel`), and Mesa RADV
+userspace for Vulkan. Universal across AMD Phoenix device IDs — the project
+currently develops and tests against the one Phoenix SKU available: Radeon
+780M (PCI `0x15bf`), which is the only personality match in `Info.plist`
+until more SKUs are validated.
+
+Dev host = x86_64 macOS 15.7.8 Hackintosh, AMFI + Secure Boot disabled (no
+kext signing needed), SIP custom. The target Phoenix machine is elsewhere —
+hardware behavior is unverified here.
 
 ## Build and validate (dev host, run from repo root)
 
@@ -51,9 +56,9 @@ clang++ -std=c++17 -I Raphaeli/Kernel scripts/tests/nmx_fb_edid_test.cpp && ./a.
 ## Hard design constraints (do not violate)
 
 1. **The driver attaches in every boot environment, including RecoveryOS** —
-   on the target machine recovery is blind without it. Never add a recovery
-   opt-out. Failed-attach safety is handled by the `raphaeli-gpu-attaching`
-   NVRAM park marker, not by refusing to attach.
+   on target Phoenix machines recovery is blind without it. Never add a
+   recovery opt-out. Failed-attach safety is handled by the
+   `raphaeli-gpu-attaching` NVRAM park marker, not by refusing to attach.
 2. **Unknown IOAccel selectors return `kIOReturnUnsupported`** — always. The
    family vtables are version-sensitive; guessing breaks WindowServer.
 3. **All failure paths must be non-panicking.** A wrong GPU address can fault a
@@ -64,6 +69,10 @@ clang++ -std=c++17 -I Raphaeli/Kernel scripts/tests/nmx_fb_edid_test.cpp && ./a.
    steps. Bundles must end up `root:wheel` for kmutil to treat them as real.
 6. **Bash scripts must run under bash 3.2** (RecoveryOS env) — no arrays,
    no `coproc`, only tools Recovery ships.
+7. **Adding a new Phoenix SKU** = extend `IOPCIPrimaryMatch` in
+   `Raphaeli/Info.plist` + verify the firmware set covers it (IP discovery
+   table revisions can differ per SKU). Never widen the match speculatively —
+   only IDs whose firmware/bring-up path has been checked.
 
 ## Code style
 
@@ -84,7 +93,7 @@ clang++ -std=c++17 -I Raphaeli/Kernel scripts/tests/nmx_fb_edid_test.cpp && ./a.
 - `build.sh` + `rt.sh` must stay green (900/900, 81/81) before committing.
 - `kmutil inspect -V tb -p <absolute kext path>` must exit 0.
 - Hardware-gated checks (selftest boot-args, WindowServer open, panel light-up)
-  can only run on the target machine — mark unverified, don't fake.
+  can only run on target Phoenix hardware — mark unverified, don't fake.
 
 ## Reproducibility
 

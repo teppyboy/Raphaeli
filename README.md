@@ -1,10 +1,12 @@
-# Raphaeli — AMD Radeon 780M (gfx1103) macOS driver
+# Raphaeli — macOS driver for AMD Phoenix APUs (gfx1103)
 
 Kernel driver (XNU kext) bringing AMD Phoenix APUs up on macOS: an `amdgpu`-based
 kernel/DRM port with a real display path (DCN), an IOFramebuffer, and an
 IOAcceleratorFamily2 glue layer — plus Mesa RADV userspace for Vulkan.
+Universal across Phoenix device IDs; currently developed and tested against
+the one available SKU, Radeon 780M (PCI `0x15bf`).
 
-```
+```text
 Metal apps → Metal plugin → AIR→SPIR-V (metal2vulkan) → RADV → libdrm → Raphaeli.kext (amdgpu port) → 780M
 ```
 
