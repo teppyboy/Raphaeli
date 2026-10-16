@@ -58,6 +58,15 @@ clang++ -std=c++17 -I Raphaeli/Kernel scripts/tests/nmx_fb_edid_test.cpp && ./a.
 
 Install routes: OpenCore (black-screen-safe, `tools/oc-install.py`) or direct kextload via `scripts/install.sh` (stages firmware through `Raphaeli/Firmware/stage.sh`, builds an offline aux KC). Both are opt-in: the driver only attaches with the `raphaeli-amd=1` boot-arg, and a boot-guard NVRAM marker parks it after a failed attach.
 
+## Design constraint: attach everywhere, including RecoveryOS
+
+On a 780M machine RecoveryOS is completely blind - Apple ships no gfx1103
+driver, so the recovery UI itself has no framebuffer. Raphaeli must therefore
+attempt attach in every boot environment (normal, verbose, RecoveryOS) whenever
+`raphaeli-amd=1` is set. Never add an opt-out that parks the driver in
+recovery; a failure there parks itself via the `raphaeli-gpu-attaching`
+boot-guard marker instead.
+
 ## Bring-up sequence
 
 1. **Capture hardware facts:** APU model, PCI IDs/revision, SMBIOS/ACPI, macOS build, firmware/BIOS settings, and which GPU currently drives the display. Keep a separate boot/recovery path.
