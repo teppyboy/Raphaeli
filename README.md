@@ -1,22 +1,26 @@
-# Raphaeli — macOS driver for AMD Phoenix APUs (gfx1103)
+# Raphaeli
 
-Kernel driver (XNU kext) bringing AMD Phoenix APUs up on macOS: an `amdgpu`-based
-kernel/DRM port with a real display path (DCN), an IOFramebuffer, and an
-IOAcceleratorFamily2 glue layer — plus Mesa RADV userspace for Vulkan.
-Universal across Phoenix device IDs; currently developed and tested against
-the one available SKU, Radeon 780M (PCI `0x15bf`).
+An experimental AMD Phoenix (RDNA 3) GPU driver for macOS.
 
-```text
-Metal apps → Metal plugin → AIR→SPIR-V (metal2vulkan) → RADV → libdrm → Raphaeli.kext (amdgpu port) → 780M
+> [!WARNING]
+> This project is vibe-coded entirely, bloated/unreadable codebase, slow maintenance and updates are expected. Use at your own risk.
+
+### How does this driver work?
+
+Kind of the architecture as [nullmoth/nvidia-macos-driver](https://github.com/nullmoth/nvidia-macos-driver), tl;dr is below:
+
+```
+Metal apps → Metal plugin → AIR→SPIR-V (metal2vulkan) → RADV → libdrm → Raphaeli.kext (amdgpu port) → GPU
 ```
 
-- **Status:** builds and links end-to-end on the dev host; not yet validated on hardware.
-- **Layout:** `Raphaeli/` (kext sources) · `kpi/` + `deps/` (pinned submodules) · `scripts/` (single build entry) · `patches/` · `docs/` (design + reports) · `dist/` (release zips, gitignored).
-- **Design & bring-up:** [docs/DESIGN.md](docs/DESIGN.md) — full architecture, bring-up sequence, limits, legal gates.
-- **Agents:** see [AGENTS.md](AGENTS.md) for build/test commands and working conventions.
+## Installation
 
-Install routes: OpenCore (`tools/oc-install.py`, black-screen-safe) or direct
-kextload (`scripts/install.sh`); userspace + firmware ships as a native `.pkg`
-(`scripts/make-pkg.sh`); a RecoveryOS installer covers blind-machine setups
-(`scripts/recovery-install.sh`). Everything is opt-in via the `raphaeli-amd=1`
-boot-arg.
+TODO
+
+## Development
+
+This driver is written entirely by LLMs, so you should use a LLM to develop instead. Still, if you're interested then see [docs/DESIGN.md](docs/DESIGN.md)
+
+## License
+
+[GNU GPLv3](./LICENSE)
