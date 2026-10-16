@@ -28,7 +28,7 @@ plutil -replace CFBundleShortVersionString -string "$HASH" "$STAGE/kext/Raphaeli
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
-cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
+cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-stage-graphics.py scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
 cp Raphaeli/Firmware/stage.sh Raphaeli/Firmware/README.md "$STAGE/tools/fw/"
 cp README.md "$STAGE/"
 
@@ -47,6 +47,14 @@ From Recovery Terminal, with the USB/EFI volumes already mounted:
 `bash tools/collect-recovery.sh /Volumes/USB/raphaeli-diagnostics /Volumes/EFI`
 Creates a `.tar.gz` with the running Recovery build, Boot KC, OpenCore logs,
 and EFI kext hash. No config/NVRAM edits. Review logs for identifiers before sharing.
+
+## Experimental Tahoe Recovery dependency staging
+On a macOS host, validate the mounted Recovery image against its exact-build KDK:
+`python3 tools/oc-stage-graphics.py /Volumes/EFI "/Volumes/macOS Base System" /path/to/KDK`
+Defaults to dry-run; `--apply` stages matching Apple graphics dependencies before
+Raphaeli and backs up config.plist. Build, x86_64 UUID, and version must match.
+Injection-tested only: target runtime is unverified. Restore the printed backup
+if boot fails; revalidate after OS/Recovery updates. Never mix Sequoia/Tahoe kexts.
 
 ## Direct (kextload route, needs matching KDK on target)
 1. `sudo ./tools/install.sh kext/Raphaeli.kext`        # installs kext + firmware + auxKC
