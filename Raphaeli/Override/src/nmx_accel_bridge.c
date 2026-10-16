@@ -165,15 +165,20 @@ int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
         return -EINVAL;
     signed long left =
         dma_fence_wait_timeout(f, false, timeout_ms != 0 ? msecs_to_jiffies(timeout_ms) : 0);
+    int status = left > 0 ? dma_fence_get_status(f) : 0;
     dma_fence_put(f);
-    return left < 0 ? (int)left : 0;
+    if (left < 0)
+        return (int)left;
+    if (left == 0 || status == 0)
+        return -ETIME;
+    return status < 0 ? status : 0;
 }
 
 /*
  * Boot-arg selftest (raphaeli-accel-test=1), called once after the driver attached (nmx_kext.cpp,
  * Raphaeli::attachNow): two PACKET3 NOPs in a GTT buffer go through the accel hooks onto gfx ring 0,
- * the fence is waited on and the result logged. A failure leaves nothing behind and cannot affect the
- * driver; without the boot argument this does nothing.
+ * the fence is waited on and the result logged. Failed waits retain the IB rather than freeing memory
+ * the GPU may still read; without the boot argument this does nothing.
  */
 int nmx_accel_selftest(void)
 {
@@ -197,12 +202,14 @@ int nmx_accel_selftest(void)
     ib[0] = PACKET3(PACKET3_NOP, 0);
     ib[1] = PACKET3(PACKET3_NOP, 0);
     uint64_t fence = 0;
+    bool ib_in_flight = false;
     kern_return_t kr = nmx_xnu_accel_ring_submit(0, gpu_addr, 2, &fence);
     if (kr != KERN_SUCCESS) {
         printf("Raphaeli accel selftest: submit refused (0x%x)\n", kr);
         r = -1;
     } else {
         kr = nmx_xnu_accel_fence_wait(fence, 5000);
+        ib_in_flight = kr != KERN_SUCCESS;
         printf("Raphaeli accel selftest: gfx ring 0 NOP IB submitted, fence %s (0x%x)\n",
                kr == KERN_SUCCESS ? "signaled: PASS" : "NOT signaled: FAIL", kr);
         r = kr == KERN_SUCCESS ? 0 : -1;
@@ -224,6 +231,10 @@ int nmx_accel_selftest(void)
             r = -1;
         }
     }
-    amdgpu_bo_free_kernel(&bo, &gpu_addr, &cpu);
+    if (!ib_in_flight)
+        amdgpu_bo_free_kernel(&bo, &gpu_addr, &cpu);
+    else
+        /* shortcut: retain the selftest's 4 KiB IB after a failed wait, release after reset once reset cleanup exists. */
+        printf("Raphaeli accel selftest: retaining 4096 B IB until reboot (completion unconfirmed)\n");
     return r;
 }
