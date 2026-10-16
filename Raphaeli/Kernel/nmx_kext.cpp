@@ -74,8 +74,10 @@ IOService *Raphaeli::probe(IOService *provider, SInt32 *score)
     uint16_t vendor = pci ? pci->configRead16(kIOPCIConfigVendorID) : 0;
     if (vendor != AMD_VENDOR && vendor != INTEL_VENDOR)
         return nullptr;
-    if (!opted_in(pci, vendor))
+    if (!opted_in(pci, vendor)) {
+        IOLog("Raphaeli checkpoint: probe parked (opt-in absent or -nvoff)\n");
         return nullptr;     /* not asked for: leave the device to macOS */
+    }
     return IOService::probe(provider, score);
 }
 
@@ -86,9 +88,9 @@ bool Raphaeli::start(IOService *provider)
         return false;
     /* audit P1: do not attach without a mapped MMIO aperture; a vGPU with a trapped/zero BAR0 would
        otherwise run amdgpu discovery against garbage */
-    uint64_t bar0_phys, bar0_size;
-    int bar0_io;
-    if (nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 0
+    uint64_t bar0_phys = 0, bar0_size = 0;
+    int bar0_io = 0;
+    if (nmx_xnu_pci_bar_info(pci, kIOPCIConfigBaseAddress0, &bar0_phys, &bar0_size, &bar0_io) != 1
         || bar0_size == 0 || bar0_io) {
         IOLog("Raphaeli GPU: no usable MMIO BAR0 (size %llu, io %d); this GPU stays with macOS\n",
               (unsigned long long)bar0_size, bar0_io);
@@ -102,6 +104,7 @@ bool Raphaeli::start(IOService *provider)
         IOService::stop(provider);
         return false;
     }
+    IOLog("Raphaeli checkpoint: PCI checks passed; starting port layer\n");
     IOLockLock(g_lock);
     if (!g_started) {
         int err = nmx_port_start();
@@ -112,6 +115,7 @@ bool Raphaeli::start(IOService *provider)
             return false;
         }
         g_started = true;
+        IOLog("Raphaeli checkpoint: port layer started\n");
         nmx_scanout_selftest();
     }
     g_devices++;
@@ -202,6 +206,7 @@ static void nmx_marker_write(bool on)
 
 void Raphaeli::attachNow()
 {
+    IOLog("Raphaeli checkpoint: attach thread entered\n");
     int err = nmx_xnu_wait_firmware_root(300);
     if (err) {
         IOLog("Raphaeli GPU: the firmware folder never appeared (%d); this GPU stays with macOS\n", err);
@@ -216,8 +221,11 @@ void Raphaeli::attachNow()
         attach_ = -1;
         return;
     }
+    IOLog("Raphaeli checkpoint: setting attach guard\n");
     nmx_marker_write(true);
+    IOLog("Raphaeli checkpoint: entering amdgpu attach\n");
     dev_ = nmx_port_attach(pci_);
+    IOLog("Raphaeli checkpoint: amdgpu attach returned (%s)\n", dev_ ? "device" : "no device");
     if (dev_ == nullptr) {
         nmx_marker_write(false);
         IOLog("Raphaeli GPU: no driver took %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
@@ -230,6 +238,7 @@ void Raphaeli::attachNow()
         { kIOPMPowerStateVersion1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
         { kIOPMPowerStateVersion1, kIOPMPowerOn, kIOPMPowerOn, kIOPMPowerOn, 0, 0, 0, 0, 0, 0, 0, 0 },
     };
+    IOLog("Raphaeli checkpoint: initializing power management\n");
     PMinit();
     pci_->joinPMtree(this);
     registerPowerDriver(this, states, 2);
@@ -237,6 +246,7 @@ void Raphaeli::attachNow()
     registerService();
     /* NMXAccel (the Metal accelerator for this GPU) starts only on a device this driver has claimed; it declined while
        the claim was pending, so matching on the device runs again now that it is set */
+    IOLog("Raphaeli checkpoint: publishing framebuffer/accelerator claim\n");
     pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
     pci_->registerService();
     nmx_marker_write(false);
@@ -248,6 +258,7 @@ void Raphaeli::attachNow()
     nmx_accel_bridge_device(pci_);
     nmx_accel_selftest();
     attach_ = 1;
+    IOLog("Raphaeli checkpoint: attach completed\n");
 }
 
 void Raphaeli::stop(IOService *provider)
@@ -294,7 +305,9 @@ kern_return_t nmx_kmod_stop(kmod_info_t *ki, void *data);
 
 kern_return_t nmx_kmod_start(kmod_info_t *ki, void *data)
 {
+    IOLog("Raphaeli checkpoint: module start entered\n");
     g_lock = IOLockAlloc();
+    IOLog("Raphaeli checkpoint: module start %s\n", g_lock ? "ready" : "failed");
     return g_lock ? KERN_SUCCESS : KERN_FAILURE;
 }
 
