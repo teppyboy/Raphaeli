@@ -15,11 +15,11 @@ STAGE="dist/$NAME"
 # Kext source dir override: RAPHAELI_KEXT=<dir> ./package.sh — needed when out/Raphaeli.kext is
 # root:wheel (post-chown for kmutil) and a fresh user-owned link lives elsewhere (e.g. out-disp).
 KEXT=${RAPHAELI_KEXT:-out/Raphaeli.kext}
-[ -d "$KEXT" ] || { echo "missing $KEXT - run scripts/link.sh first" >&2; exit 1; }
+[ -f "$KEXT/Contents/Info.plist" ] || { echo "$KEXT is not a kext bundle - pass e.g. RAPHAELI_KEXT=out-disp/Raphaeli.kext" >&2; exit 1; }
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
 
 rm -rf "$STAGE"
-mkdir -p "$STAGE"/{kext,usr/lib,firmware/amdgpu,tools/fw}
+rm -rf "$STAGE"; mkdir -p "$STAGE"/{kext,usr/lib,firmware/amdgpu,tools/fw}
 
 ditto "$KEXT" "$STAGE/kext/Raphaeli.kext"
 # stamp the staged kext with the commit it was built from
