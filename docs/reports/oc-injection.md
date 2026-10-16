@@ -1,5 +1,12 @@
 # OC prelinked injection of Raphaeli.kext fails: Invalid Parameter
 
+> Superseded diagnosis: local OpenCore userspace reproduction now shows missing
+> graphics-family superclass vtables are fatal, not benign. The dependency-version
+> changes below did not establish target injection success. The target boots
+> Tahoe Recovery, not the Sequoia version assumed below. See
+> [OC vtable reproduction](oc-vtable-reproduction.md) for evidence and remaining
+> target-specific validation. Do not use this historical report as proof of a fix.
+
 Symptom (target 780M machine, OpenCore verbose boot):
 
 ```text

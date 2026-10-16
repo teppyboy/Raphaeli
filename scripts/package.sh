@@ -28,7 +28,7 @@ plutil -replace CFBundleShortVersionString -string "$HASH" "$STAGE/kext/Raphaeli
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
-cp scripts/install.sh scripts/recovery-install.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
+cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
 cp Raphaeli/Firmware/stage.sh Raphaeli/Firmware/README.md "$STAGE/tools/fw/"
 cp README.md "$STAGE/"
 
@@ -41,6 +41,12 @@ Unsigned kext - requires AMFI + Secure Boot disabled (Hackintosh).
 1. `python3 tools/oc-install.py /path/to/EFI --add`   # loads inert, display untouched
 2. `python3 tools/oc-install.py /path/to/EFI --enable` # adds raphaeli-amd=1 boot-arg
 3. Reboot. Recovery: `--disable` or set Enabled=false in config.plist.
+
+## Recovery diagnostics
+From Recovery Terminal, with the USB/EFI volumes already mounted:
+`bash tools/collect-recovery.sh /Volumes/USB/raphaeli-diagnostics /Volumes/EFI`
+Creates a `.tar.gz` with the running Recovery build, Boot KC, OpenCore logs,
+and EFI kext hash. No config/NVRAM edits. Review logs for identifiers before sharing.
 
 ## Direct (kextload route, needs matching KDK on target)
 1. `sudo ./tools/install.sh kext/Raphaeli.kext`        # installs kext + firmware + auxKC

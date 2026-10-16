@@ -1,5 +1,12 @@
 # Tahoe recovery prelink regression: bisect 02e386e → 795067e
 
+> Correction: the user subsequently confirmed injection always fails; Recovery
+> UI visibility was mistaken for a successful load. c841a35 fixes real dangling
+> firmware symbols, but is NOT the complete injection fix. The three new family
+> symbols were not proven safe by the old build. See
+> [OC vtable reproduction](oc-vtable-reproduction.md) for the reproduced
+> missing-superclass-vtable failure and controlled dependency-injection tests.
+
 Symptom (macOS 26.6 Tahoe RecoveryOS, user log; plist byte-identical to the
 working 02e386e build):
 
@@ -22,7 +29,7 @@ no rebuild-bisect past 02e386e needed — the diff isolated the change outright.
 
 | symbol (Mach-O name) | demangled | source | verdict |
 |---|---|---|---|
-| `__nmx_fw_<blob>_start` / `__nmx_fw_<blob>_end` × 28 | firmware blob markers (14 blobs × 2) | de4b39c fw-in-bundle | **unresolvable — root cause** |
+| `__nmx_fw_<blob>_start` / `__nmx_fw_<blob>_end` × 28 | firmware blob markers (14 blobs × 2) | de4b39c fw-in-bundle | **unresolvable — firmware defect, not the complete OC failure explanation** |
 | `__ZN11IOAccelTask8allocateEPK16IOAccelMemoryMap` | `IOAccelTask::allocate(IOAccelMemoryMap const*)` | 1089cc2 accel v2 | OK — IOAcceleratorFamily2 symbol, same kernel-stub path already proven at 02e386e |
 | `__ZN11IOAccelTask10deallocateEPK16IOAccelMemoryMapy` | `IOAccelTask::deallocate(IOAccelMemoryMap const*, unsigned long long)` | 1089cc2 accel v2 | OK — same |
 | `__ZN16IORangeAllocator9withRangeEyyjj` | `IORangeAllocator::withRange(unsigned long long, unsigned long long, unsigned int, unsigned int)` | 1089cc2 accel v2 | OK — IOGraphicsFamily symbol, same |
