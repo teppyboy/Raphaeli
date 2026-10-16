@@ -28,7 +28,7 @@ plutil -replace CFBundleShortVersionString -string "$HASH" "$STAGE/kext/Raphaeli
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
-cp scripts/install.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
+cp scripts/install.sh scripts/recovery-install.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
 cp Raphaeli/Firmware/stage.sh Raphaeli/Firmware/README.md "$STAGE/tools/fw/"
 cp README.md "$STAGE/"
 
@@ -50,6 +50,23 @@ Unsigned kext - requires AMFI + Secure Boot disabled (Hackintosh).
 ## Userspace (Vulkan)
 - `usr/lib/libvulkan_radeon.dylib` + `usr/lib/radeon_icd.x86_64.json`
 - point VK_ICD_FILENAMES at the json; libdrm libs are its dependencies
+
+## Installing from macOS Recovery
+For when the normal volume's WindowServer crashes and kextload is impossible.
+Boot into RecoveryOS, open Terminal:
+1. `./tools/recovery-install.sh /Volumes/Macintosh\ HD --apply`
+   (auto-detects the volume if unambiguous; add `--dry-run` to preview)
+- APFS: tries `mount -uw`; dylibs go to `Library/Raphaeli/usr/lib/` (Sealed
+  System Volume makes `/usr/lib` unwritable) and the ICD json is written to
+  `usr/local/share/vulkan/icd.d/` with an absolute `library_path`
+- OC-injected setups: detects `EFI/OC/config.plist` and skips the kext copy +
+  auxKC (OC injects); firmware/userspace/boot-args only. config.plist is never
+  edited here - use `oc-install.py` from the booted system
+- `--apply` sets `raphaeli-amd=1` in NVRAM; `--uninstall` removes it, the
+  `raphaeli-gpu-attaching` guard marker, and everything installed above
+- If no auxKC could be built (no matching KDK in Recovery), finish with
+  `sudo ./tools/install.sh kext/Raphaeli.kext --apply` from the booted system
+- Vulkan loader hint if discovery fails: `VK_DRIVER_FILES=/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json`
 EOF
 
 ( cd dist && rm -f "$NAME.zip" && zip -qr "$NAME.zip" "$NAME" )
