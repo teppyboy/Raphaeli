@@ -1,15 +1,28 @@
 #!/bin/bash
-# kpi-init.sh: make sure kpi/ submodules exist and carry our patches.
+# kpi-init.sh: make sure kpi/ + deps/ submodules exist and carry our patches.
 # Idempotent - run before any build; cheap when already applied.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-git -c protocol.file.allow=always submodule update --init kpi/drm-kmod
+git -c protocol.file.allow=always submodule update --init kpi/drm-kmod deps/metal2vulkan deps/libdrm
 
 # freebsd-src: shallow submodule; init if missing
+if [ ! -f deps/mesa/src/gallium/frontends/drm ] && [ ! -d deps/mesa/src ]; then
+    git -c protocol.file.allow=always submodule update --init deps/mesa
+fi
+
 if [ ! -f kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kobject.h ]; then
     git -c protocol.file.allow=always submodule update --init kpi/freebsd-src
 fi
 
+# mesa + libdrm carry macOS build patches; apply when not yet applied
+for p in mesa-macos libdrm-macos; do
+    [ -f "$ROOT/patches/$p.patch" ] || continue
+    tree="deps/$(echo "$p" | cut -d- -f1)"
+    if git -C "$tree" apply --check "$ROOT/patches/$p.patch" 2>/dev/null; then
+        git -C "$tree" apply "$ROOT/patches/$p.patch"
+        echo "kpi-init: applied patches/$p.patch"
+    fi
+done
 echo "kpi-init: ok"

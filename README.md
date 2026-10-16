@@ -30,8 +30,9 @@ scripts/             every build/tooling script (single build entry)
   gen_ccdb.sh / gen_flags.py / srclist.py / xesrc.py / fork_*.py   generators
   tests/               host-side selftests (nmx_fb_edid_test.cpp)
 docs/                design notes + lane contracts (docs/reports/ = key audit reports)
-patches/             source patches: mesa-macos, libdrm-macos, freebsd-src-linuxkpi (applied to kpi/ submodules)
-kpi/                 pinned git submodules (upstream freebsd trees): drm-kmod, freebsd-src
+patches/             source patches: mesa-macos, libdrm-macos (deps/), freebsd-src-linuxkpi (kpi/)
+kpi/                 pinned kernel KPI git submodules: drm-kmod, freebsd-src
+deps/                pinned userspace build git submodules: mesa, libdrm, metal2vulkan
 out/, out-disp/, dist/, firmware/, work-*/, obj*/, lkobj/, srcobj/, xnuobj/, logs*/   gitignored build trees
 ```
 

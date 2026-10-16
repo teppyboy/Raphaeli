@@ -7,3 +7,15 @@
 	path = kpi/freebsd-src
 	url = https://github.com/freebsd/freebsd-src.git
 	ignore = dirty
+[submodule "deps/metal2vulkan"]
+	path = deps/metal2vulkan
+	url = https://github.com/steelbrain/metal2vulkan.git
+	ignore = dirty
+[submodule "deps/libdrm"]
+	path = deps/libdrm
+	url = https://gitlab.freedesktop.org/mesa/drm.git
+	ignore = dirty
+[submodule "deps/mesa"]
+	path = deps/mesa
+	url = https://gitlab.freedesktop.org/mesa/mesa.git
+	ignore = dirty
