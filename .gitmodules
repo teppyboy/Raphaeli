@@ -2,6 +2,7 @@
 	path = kpi/drm-kmod
 	url = https://github.com/freebsd/drm-kmod.git
 	ignore = dirty
+	shallow = true
 [submodule "kpi/freebsd-src"]
 	shallow = true
 	path = kpi/freebsd-src
@@ -11,11 +12,14 @@
 	path = deps/metal2vulkan
 	url = https://github.com/steelbrain/metal2vulkan.git
 	ignore = dirty
+	shallow = true
 [submodule "deps/libdrm"]
 	path = deps/libdrm
 	url = https://gitlab.freedesktop.org/mesa/drm.git
 	ignore = dirty
+	shallow = true
 [submodule "deps/mesa"]
 	path = deps/mesa
 	url = https://gitlab.freedesktop.org/mesa/mesa.git
 	ignore = dirty
+	shallow = true

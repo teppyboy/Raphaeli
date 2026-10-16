@@ -1,5 +1,7 @@
 #!/bin/bash
 # kpi-init.sh: make sure kpi/ + deps/ submodules exist and carry our patches.
+# Fresh machine: git clone --recurse-submodules --shallow-submodules --depth 1 <repo>
+# (or: git submodule update --init --depth 1) - pins fetch fine from upstream.
 # Idempotent - run before any build; cheap when already applied.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
