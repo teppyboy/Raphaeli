@@ -23,6 +23,12 @@ for req in $(awk '/^REQUIRED="/{f=1;next} f&&/^"/{exit} f{print}' Raphaeli/Firmw
         echo "MISSING embedded firmware/amdgpu/$req"; fail=1
     fi
 done
+# regression (Tahoe prelink bisect): the table's extern "C" refs resolve as __nmx_fw_* after the
+# C underscore prefix; any UNDEFINED nmx_fw symbol means the .incbin object's labels mismatch the
+# table again and kxld prelink dies with Invalid Parameter on OC injection
+if nm -m "$K/MacOS/Raphaeli" | grep '(undefined' | grep -q '_nmx_fw_'; then
+    echo "UNDEFINED fw symbols in binary (asm label underscore mismatch)"; fail=1
+fi
 echo
 if [ "$fail" != 0 ]; then
     echo "census: incomplete; re-run scripts/link.sh with the full firmware/amdgpu/ set staged"

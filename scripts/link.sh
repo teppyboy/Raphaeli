@@ -31,11 +31,14 @@ done
     for f in $FW_BINS; do
         s=$(basename "$f" .bin | tr . _)
         echo '.p2align 4'
-        echo ".globl _nmx_fw_${s}_start"
-        echo "_nmx_fw_${s}_start:"
+        # asm labels are literal; the C driver adds one more '_' to the extern "C" name, so the
+        # symbol must carry a double underscore or the kext links with 2N dangling undefineds
+        # that kxld cannot resolve -> OC prelinked injection fails (Invalid Parameter)
+        echo ".globl __nmx_fw_${s}_start"
+        echo "__nmx_fw_${s}_start:"
         echo ".incbin \"$X/$f\""
-        echo ".globl _nmx_fw_${s}_end"
-        echo "_nmx_fw_${s}_end:"
+        echo ".globl __nmx_fw_${s}_end"
+        echo "__nmx_fw_${s}_end:"
     done
 } > "$FWGEN/nmx_firmware_blobs.S"
 {
