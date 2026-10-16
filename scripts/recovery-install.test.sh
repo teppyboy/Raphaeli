@@ -1,6 +1,7 @@
 #!/bin/bash
-# Tests for recovery-install.sh: fake dist tree + fake volume in a temp dir,
-# mocked nvram (recorded in a state file). No system changes, no real /Volumes.
+# Tests for recovery-install.c (compiled here): fake dist tree + fake volume in
+# a temp dir, mocked nvram (state file on PATH). No system changes, no real
+# /Volumes. The deliverable program itself is C; this harness only drives it.
 set -uo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -34,18 +35,25 @@ trap 'rm -rf "$WORK"' EXIT
 # ---- fake dist tree (mirrors the package.sh zip layout) ----------------------
 
 DIST=$WORK/dist
-mkdir -p "$DIST"/{tools/fw,usr/lib,firmware/amdgpu}
-cp "$HERE/recovery-install.sh" "$DIST/tools/"
-cp "$HERE/../Raphaeli/Firmware/stage.sh" "$DIST/tools/fw/"
+mkdir -p "$DIST"/{tools,usr/lib,firmware/amdgpu}
+DIST=$(cd "$DIST" && pwd -P)   # canonical (realpath resolves /var -> /private/var)
+
+# compile the deliverable with the documented flags; warnings are failures
+BIN=$DIST/tools/recovery-install
+CC_OUT=$(clang -O2 -Wall -o "$BIN" "$HERE/recovery-install.c" 2>&1)
+if [[ -x $BIN && -z $CC_OUT ]]; then
+  echo "ok    compiles clean with -O2 -Wall"; pass=$((pass + 1))
+else
+  echo "FAIL  compiles clean with -O2 -Wall"; echo "$CC_OUT" | sed 's/^/      /'
+  fail=$((fail + 1))
+  echo "$out"; echo "passed=$pass failed=$fail"; exit 1
+fi
+# ship-layout check: source is copied next to the binary by package.sh (not tested here)
 
 # minimal kext bundle: Contents/Info.plist + executable, correct bundle id
 KEXT=$DIST/kext/Raphaeli.kext
 mkdir -p "$KEXT/Contents/MacOS"
-plutil -insert CFBundleIdentifier -string me.tretrauit.raphaeli \
-  -insert CFBundleExecutable -string raphaeli \
-  "$KEXT/Contents/Info.plist" 2>/dev/null || {
-  printf '<?xml version="1.0"?>\n<plist version="1.0"><dict>\n<key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>\n<key>CFBundleExecutable</key><string>raphaeli</string>\n</dict></plist>\n' > "$KEXT/Contents/Info.plist"
-}
+printf '<?xml version="1.0"?>\n<plist version="1.0"><dict>\n<key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>\n<key>CFBundleExecutable</key><string>raphaeli</string>\n</dict></plist>\n' > "$KEXT/Contents/Info.plist"
 : > "$KEXT/Contents/MacOS/raphaeli"; chmod +x "$KEXT/Contents/MacOS/raphaeli"
 
 : > "$DIST/usr/lib/libvulkan_radeon.dylib"
@@ -69,7 +77,7 @@ case "\$1" in
   *=*)
     k=\${1%%=*}; v=\${1#*=}
     { grep -v "^\$k	" "\$S" || true; } > "\$S.new"; mv "\$S.new" "\$S"
-    printf '%s\t%s\n' "\$k" "\$v" >> "\$S"
+    printf '%s	%s\n' "\$k" "\$v" >> "\$S"
     ;;
   *)  # nvram boot-args
     grep "^\$1	" "\$S" || exit 1
@@ -86,7 +94,7 @@ newvol() { # newvol <name> -> echoes path; minimal macOS volume shape
 }
 
 run_inst() { # run_inst <volume> <args...>
-  PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" "$@"
+  PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$BIN" "$@"
 }
 
 # ---- volume detection ---------------------------------------------------------
@@ -95,13 +103,13 @@ V1=$(newvol "Macintosh HD")
 V2=$(newvol "Other HD")
 t "explicit volume works"            0 run_inst "$V1" --dry-run
 t "ambiguous volumes fail"           1 env PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR \
-                                        "$DIST/tools/recovery-install.sh" --dry-run
-assert_out "ambiguity prints usage"  "usage: recovery-install.sh /Volumes/Macintosh"
+                                        "$BIN" --dry-run
+assert_out "ambiguity prints usage"  "usage: recovery-install /Volumes/Macintosh"
 
 t "two candidates: explicit still ok" 0 run_inst "$V2" --dry-run
 
 rm -rf "$V2"                          # single candidate -> auto-detected
-out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" --dry-run 2>&1)
+out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$BIN" --dry-run 2>&1)
 if [[ $? == 0 && $out == *"target volume: $V1"* ]]; then
   echo "ok    single candidate auto-detected"; pass=$((pass + 1))
 else
@@ -111,13 +119,14 @@ fi
 # ---- dry-run output -----------------------------------------------------------
 
 t "dry-run exits 0"                       0 run_inst "$V1" --dry-run
-assert_out "prints dylib copy"            "cp -f"
+assert_out "prints dylib copy"            "DRY-RUN: cp -f"
 assert_out "dylibs to Library/Raphaeli"   "$V1/Library/Raphaeli/usr/lib"
 assert_out "prints ICD json path"         "$V1/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"
 assert_out "prints absolute library_path" "library_path=/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
-assert_out "prints kext ditto"            "ditto *dist/kext/Raphaeli.kext"
+assert_out "prints kext ditto"            "ditto $DIST/kext/Raphaeli.kext"
 assert_out "prints chown root:wheel"      "chown -R root:wheel"
-assert_out "prints firmware staging"      "stage.sh"
+assert_out "prints chmod 755"             "chmod -R 755"
+assert_out "prints firmware staging"      "staging firmware"
 assert_out "prints mount -uw"             "mount -uw $V1"
 assert_out "no boot-args without --apply" "not applying boot-args"
 if [[ $out != *"nvram boot-args="* ]]; then
@@ -151,7 +160,7 @@ else
   echo "FAIL  json library_path absolute"; cat "$V1/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"; fail=$((fail + 1))
 fi
 
-# boot-args: added on top of pre-existing args, guard marker untouched
+# boot-args: added on top of pre-existing args
 expected="nv_disable=1 raphaeli-amd=1"
 got=$(grep '^boot-args	' "$NVRAM_STATE" | cut -f2-)
 if [[ $got == "$expected" ]]; then
@@ -182,7 +191,7 @@ assert_out "skips kext copy"          "skipping kext copy + auxKC"
   { echo "ok    ICD json in OC mode"; pass=$((pass + 1)); } || \
   { echo "FAIL  ICD json in OC mode"; fail=$((fail + 1)); }
 
-# ---- checksum manifest --------------------------------------------------------
+# ---- checksum manifest (CommonCrypto verification) ----------------------------
 
 V4=$(newvol "BadSum HD")
 ( cd "$DIST/firmware/amdgpu" && shasum -a 256 psp_13_0_11_toc.bin > SHA256SUMS \
@@ -228,9 +237,22 @@ grep -q '^boot-args	' "$NVRAM_STATE" && \
 
 # ---- misc ---------------------------------------------------------------------
 
+t "help exits 0"                      0 run_inst --help
 t "unknown option fails"              1 run_inst "$V1" --bogus
 t "nonexistent volume fails"          1 run_inst "$WORK/no-such-vol"
 t "non-macOS volume fails"            1 run_inst "$WORK"   # no Library/
+
+# bad bundle id rejected
+BADKEXT=$WORK/bad/Raphaeli.kext
+mkdir -p "$BADKEXT/Contents/MacOS"
+printf '<?xml version="1.0"?>\n<plist version="1.0"><dict>\n<key>CFBundleIdentifier</key><string>com.other.kext</string>\n</dict></plist>\n' > "$BADKEXT/Contents/Info.plist"
+out=$(RAPHAELI_KEXT=$BADKEXT RAPHAELI_FW_SRC=$DIST/firmware/amdgpu PATH="$SHIM:$PATH" \
+      RAPHAELI_VOLUMES_DIR=$VOLDIR "$BIN" "$V1" --dry-run 2>&1)
+if [[ $? == 1 && $out == *"unexpected bundle id 'com.other.kext'"* ]]; then
+  echo "ok    wrong bundle id rejected"; pass=$((pass + 1))
+else
+  echo "FAIL  wrong bundle id rejected"; echo "$out" | sed 's/^/      /'; fail=$((fail + 1))
+fi
 
 echo
 echo "passed=$pass failed=$fail"

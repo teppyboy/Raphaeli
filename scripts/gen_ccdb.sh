@@ -40,6 +40,11 @@ selftest = root + "/scripts/tests/nmx_fb_edid_test.cpp"
 if os.path.isfile(selftest):
     entries.append({"directory": root, "file": selftest,
                     "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++", "-std=c++17", "-isysroot", sdk, "-I", root + "/Raphaeli/Kernel", "-c", selftest]})
+# recovery-install.c: userspace host C tool (libSystem only, no kernel headers)
+rec = root + "/scripts/recovery-install.c"
+if os.path.isfile(rec):
+    entries.append({"directory": root, "file": rec,
+                    "arguments": ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang", "-std=c11", "-isysroot", sdk, "-O2", "-Wall", "-c", rec]})
 pathlib.Path(root + "/compile_commands.json").write_text(json.dumps(entries, indent=1))
 print("entries:", len(entries))
 EOF
