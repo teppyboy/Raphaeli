@@ -127,7 +127,7 @@ fi
 cat > "$STAGE/distribution.xml" <<'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
-    <title>Raphaeli 780M driver (userspace + firmware)</title>
+    <title>Raphaeli</title>
     <options customize="never" allow-external-scripts="false" require-scripts="false"/>
     <domains enable_anywhere="true" enable_currentUserHome="false" enable_localSystem="true"/>
     <os-version min="14.0"/>

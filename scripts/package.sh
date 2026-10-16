@@ -73,5 +73,6 @@ EOF
 ( cd dist && rm -f "$NAME.zip" && zip -qr "$NAME.zip" "$NAME" )
 echo "dist/$NAME.zip:"; ls -la "dist/$NAME.zip"
 
-# native installer (userspace + firmware, optional kext) next to the zip
-./scripts/make-pkg.sh "$STAGE" --with-kext
+# native installer (userspace + firmware only - the zip covers the kext route)
+# lands in dist/, never inside the zip
+./scripts/make-pkg.sh dist
