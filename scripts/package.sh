@@ -28,12 +28,7 @@ plutil -replace CFBundleShortVersionString -string "$HASH" "$STAGE/kext/Raphaeli
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
-cp scripts/install.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
-# recovery installer: compiled from source at package time (x86_64, libSystem only)
-echo "== compiling tools/recovery-install (x86_64)"
-clang -O2 -Wall -arch x86_64 -mmacosx-version-min=15.0 -o "$STAGE/tools/recovery-install" scripts/recovery-install.c || exit 1
-cp scripts/recovery-install.c "$STAGE/tools/"
-file "$STAGE/tools/recovery-install"
+cp scripts/install.sh scripts/recovery-install.sh scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
 cp Raphaeli/Firmware/stage.sh Raphaeli/Firmware/README.md "$STAGE/tools/fw/"
 cp README.md "$STAGE/"
 
@@ -59,9 +54,9 @@ Unsigned kext - requires AMFI + Secure Boot disabled (Hackintosh).
 ## Installing from macOS Recovery
 For when the normal volume's WindowServer crashes and kextload is impossible.
 Boot into RecoveryOS, open Terminal:
-1. `./tools/recovery-install /Volumes/Macintosh\ HD --apply`
+1. `./tools/recovery-install.sh /Volumes/Macintosh\ HD --apply`
    (auto-detects the volume if unambiguous; add `--dry-run` to preview;
-   source in `tools/recovery-install.c`, libSystem-only, no external deps)
+   plain bash 3.2 + coreutils, exactly what RecoveryOS ships)
 - APFS: tries `mount -uw`; dylibs go to `Library/Raphaeli/usr/lib/` (Sealed
   System Volume makes `/usr/lib` unwritable) and the ICD json is written to
   `usr/local/share/vulkan/icd.d/` with an absolute `library_path`
