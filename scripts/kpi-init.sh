@@ -12,9 +12,4 @@ if [ ! -f kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kobject.h ]; 
     git -c protocol.file.allow=always submodule update --init kpi/freebsd-src
 fi
 
-# our LinuxKPI edits live as a patch; apply only when not yet applied
-if [ -f "$ROOT/patches/freebsd-src-linuxkpi.patch" ] && git -C kpi/freebsd-src apply --check "$ROOT/patches/freebsd-src-linuxkpi.patch" 2>/dev/null; then
-    git -C kpi/freebsd-src apply "$ROOT/patches/freebsd-src-linuxkpi.patch"
-    echo "kpi-init: applied patches/freebsd-src-linuxkpi.patch"
-fi
 echo "kpi-init: ok"

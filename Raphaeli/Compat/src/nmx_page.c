@@ -690,8 +690,9 @@ void pmap_unmapdev(void *va, vm_size_t size)
  * the kernel's own view, which is coherent for a discrete GPU because PCIe accesses to system RAM snoop the CPU
  * caches (an integrated NPU's need not: see pmap_page_set_memattr).
  */
-int pmap_change_attr(vm_offset_t va, vm_size_t size, int mode)
+int pmap_change_attr(void *va, vm_size_t size, int mode)
 {
+    (void)va;
     return 0;
 }
 

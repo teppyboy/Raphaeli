@@ -55,7 +55,7 @@ bool nmx_phys_in_dmap(vm_paddr_t pa);
 #define PMAP_HAS_DMAP 1
 #define PHYS_IN_DMAP(pa) nmx_phys_in_dmap(pa)
 #define PHYS_TO_DMAP_ADDR(pa) ((vm_offset_t)nmx_phys_to_kva(pa))
-#define PHYS_TO_DMAP(pa) ((vm_offset_t)nmx_phys_to_kva(pa))
+#define PHYS_TO_DMAP(pa) ((void *)nmx_phys_to_kva(pa))
 vm_paddr_t nmx_kva_to_phys(const void *va);
 #define DMAP_TO_PHYS(va) nmx_kva_to_phys((const void *)(va))
 vm_page_t vm_page_alloc_noobj(int req);

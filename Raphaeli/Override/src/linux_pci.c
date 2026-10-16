@@ -86,6 +86,12 @@
 #include "backlight_if.h"
 #include "pcib_if.h"
 
+/* LinuxKPI f4fe4c3d17f made these lkpi_-prefixed and static in its linux_pci.c; our fork keeps
+ * the shared registry in our linux_compat.c. */
+extern struct list_head pci_drivers;
+extern struct list_head pci_devices;
+extern spinlock_t pci_lock;
+
 /* Undef the linux function macro defined in linux/pci.h */
 #undef pci_get_class
 

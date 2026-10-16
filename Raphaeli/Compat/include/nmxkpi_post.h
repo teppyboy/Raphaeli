@@ -20,30 +20,7 @@ struct vfsmount;
 /* Linux 6.14 renamed kthread_create_worker to kthread_run_worker; LinuxKPI only has the old name. */
 #define kthread_run_worker(flags, fmt, ...) kthread_create_worker(flags, fmt, ##__VA_ARGS__)
 
-/* usleep_range_state: the state argument (TASK_UNINTERRUPTIBLE etc.) is dropped — LinuxKPI
- * has no way to pick the sleep state, usleep_range already sleeps interruptibly. */
-#define usleep_range_state(min, max, state) usleep_range(min, max)
-
-/* DMA attr flags are dropped: LinuxKPI's dma_unmap_page ignores them. */
-#define dma_unmap_page_attrs(dev, addr, size, dir, attrs) dma_unmap_page(dev, addr, size, dir)
-
-/* ACPI S4 resume never goes through firmware on this port; callers only test "are we resuming
- * from hibernate", which is always false under xnu kexts. */
-static inline int pm_resume_via_firmware(void) { return (0); }
-
 /* xnu has no ACPI video extension: the companion device never exists, EDID probes
  * fall back to the connector's own DDC. */
 #define ACPI_COMPANION(dev) NULL
 #define ACPI_VIDEO_DISPLAY_LCD 0
-#include <sys/errno.h>
-static inline int acpi_video_get_edid(void *acpidev, int display_type,
-    int device_id, void **edid) { return (-ENODEV); }
-
-/* Linux's strscpy takes an explicit length; a few drm-kmod callers use the 2-arg
- * FreeBSD form, which copies into a fixed-size array (fb->comm). Pulled in here so
- * the macro below cannot mangle string.h's own strscpy definition. */
-#include <linux/string.h>
-#define nmx_strscpy_2(dst, src) strscpy((dst), (src), sizeof(dst))
-#define nmx_strscpy_3(dst, src, len) strscpy((dst), (src), (len))
-#define nmx_strscpy_pick(_1, _2, _3, name, ...) name
-#define strscpy(...) nmx_strscpy_pick(__VA_ARGS__, nmx_strscpy_3, nmx_strscpy_2)(__VA_ARGS__)

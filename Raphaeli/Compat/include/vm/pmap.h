@@ -8,7 +8,7 @@ vm_paddr_t pmap_kextract(vm_offset_t va);
 void *pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, int mode);
 #define pmap_mapdev(pa, size) pmap_mapdev_attr((pa), (size), VM_MEMATTR_UNCACHEABLE)
 void pmap_unmapdev(void *va, vm_size_t size);
-int pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
+int pmap_change_attr(void *va, vm_size_t size, int mode);
 void pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
 void pmap_page_set_memattr_noflush(vm_page_t m, vm_memattr_t ma);
 void pmap_invalidate_cache(void);
