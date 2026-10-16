@@ -13,10 +13,8 @@ if [ ! -f kpi/freebsd-src/sys/compat/linuxkpi/common/include/linux/kobject.h ]; 
 fi
 
 # our LinuxKPI edits live as a patch; apply only when not yet applied
-if [ -f patches/freebsd-src-linuxkpi.patch ]; then
-    if git -C kpi/freebsd-src apply --check "$ROOT/patches/freebsd-src-linuxkpi.patch" 2>/dev/null; then
-        git -C kpi/freebsd-src apply "$ROOT/patches/freebsd-src-linuxkpi.patch"
-        echo "kpi-init: applied patches/freebsd-src-linuxkpi.patch"
-    fi
+if [ -f "$ROOT/patches/freebsd-src-linuxkpi.patch" ] && git -C kpi/freebsd-src apply --check "$ROOT/patches/freebsd-src-linuxkpi.patch" 2>/dev/null; then
+    git -C kpi/freebsd-src apply "$ROOT/patches/freebsd-src-linuxkpi.patch"
+    echo "kpi-init: applied patches/freebsd-src-linuxkpi.patch"
 fi
 echo "kpi-init: ok"
