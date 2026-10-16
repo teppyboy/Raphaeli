@@ -16,7 +16,7 @@
 `Raphaeli::probe()` (nmx_kext.cpp:57-73) reads the device vendor, then calls
 `opted_in()` (nmx_kext.cpp:59-70):
 
-- If `-nvoff` is set → return false (parks every Raphaeli GPU driver for that boot).
+- If `-amdgpuoff` is set → return false (parks every Raphaeli GPU driver for that boot).
 - If `raphaeli-amd=1` (AMD vendor, our case) parses with a nonzero value → opt in.
 - Else, if the IOPCIDevice has a truthy `raphaeli-gpu` property → opt in.
 - Otherwise → false.
@@ -30,7 +30,7 @@ a 780M-only machine where a display-capable driver must never load by default.
 
 Secondary park paths (install.sh header + nmx_kext.cpp:156):
 `raphaeli-gpu-attaching` NVRAM marker set during attach parks the driver on
-the next boot if a previous attach never returned; `-nvoff` parks per-boot.
+the next boot if a previous attach never returned; `-amdgpuoff` parks per-boot.
 
 ## What oc-install does
 
@@ -56,7 +56,7 @@ the next boot if a previous attach never returned; `-nvoff` parks per-boot.
   `--dry-run` prints planned actions only.
 - Never touches SystemKernelExtensions / aux KC / kmutil (OC injects without
   aux rebuild). Always prints the OC boot-menu safety note (Cmd+V, --disable
-  or Enabled=false restores display, -nvoff, boot-guard marker).
+  or Enabled=false restores display, -amdgpuoff, boot-guard marker).
 
 ## Linux path (no macOS available)
 

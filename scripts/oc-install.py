@@ -9,7 +9,7 @@ config but stays inert by default. xnu/nmx_kext.cpp probe() declines every
 device unless the user opts in with the raphaeli-amd=1 boot-arg (or the
 "raphaeli-gpu" device property), so a display-capable driver never loads
 unintentionally and there is no half-attached GPU / black screen at boot.
--nvoff parks every Raphaeli GPU driver for one boot; the NVRAM marker
+-amdgpuoff parks every Raphaeli GPU driver for one boot; the NVRAM marker
 raphaeli-gpu-attaching parks it after a failed attach (see install.sh).
 
 OC injects kexts without an aux KC rebuild: this tool never touches
@@ -489,7 +489,7 @@ OC boot-menu safety:
   - To enable GPU attachment: --enable (adds raphaeli-amd=1 to boot-args).
   - To get your display back at any time: --disable (strips raphaeli-amd=1) or
     set Enabled=false on the Raphaeli.kext entry in config.plist, or boot with
-    -nvoff (parks every Raphaeli GPU driver for one boot).
+    -amdgpuoff (parks every Raphaeli GPU driver for one boot).
   - Boot guard: the kext sets the NVRAM marker raphaeli-gpu-attaching while
     attaching; if a boot fails, the next boot parks the driver. Clear with:
     nvram -d raphaeli-gpu-attaching

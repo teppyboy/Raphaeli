@@ -55,8 +55,8 @@ static int g_devices;
 static bool opted_in(IOPCIDevice *pci, uint16_t vendor)
 {
     int v = 0;
-    /* the boot picker's "Start once without NVIDIA driver" entry (-nvoff) parks every Raphaeli GPU driver for that start */
-    if (PE_parse_boot_argn("-nvoff", &v, sizeof(v)))
+    /* Explicit one-boot park overrides the opt-in argument and device property. */
+    if (PE_parse_boot_argn("-amdgpuoff", &v, sizeof(v)))
         return false;
     if (PE_parse_boot_argn(vendor == AMD_VENDOR ? "raphaeli-amd" : "raphaeli-intel", &v, sizeof(v)) && v != 0)
         return true;
@@ -75,7 +75,7 @@ IOService *Raphaeli::probe(IOService *provider, SInt32 *score)
     if (vendor != AMD_VENDOR && vendor != INTEL_VENDOR)
         return nullptr;
     if (!opted_in(pci, vendor)) {
-        IOLog("Raphaeli checkpoint: probe parked (opt-in absent or -nvoff)\n");
+        IOLog("Raphaeli checkpoint: probe parked (opt-in absent or -amdgpuoff)\n");
         return nullptr;     /* not asked for: leave the device to macOS */
     }
     return IOService::probe(provider, score);

@@ -90,7 +90,7 @@ target anyway (see checklist).
    `Kernel > Add` entry Enabled (check `--status`).
 5. boot-args: kext stays inert until `raphaeli-amd=1` (`--enable`). For first
    bring-up attach: verbose (`-v`) + `raphaeli-amd=1`; abort with `--disable`,
-   `Enabled=false`, or `-nvoff`.
+   `Enabled=false`, or `-amdgpuoff`.
 
 ## Changes made
 

@@ -10,7 +10,7 @@ cross-KC duplicate-family behavior, class initialization and driver startup are
 not yet distinguished.
 
 Existing diagnostic: keep all entries enabled, preserve verbose/panic-stop boot
-args, temporarily add existing `-nvoff`. Source `opted_in` checks it before the
+args, temporarily add existing `-amdgpuoff`. Source `opted_in` checks it before the
 AMD opt-in and device property. This is a one-boot diagnostic, not an automatic
 Recovery opt-out. Do not clear the failed-attach NVRAM park marker.
 
