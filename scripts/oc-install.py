@@ -26,15 +26,15 @@ Usage:
                 positional also accepted)
   --firmware-src dir with linux-firmware amdgpu blobs; stage via fw/stage.sh
                 onto <system-root>/Library/Raphaeli/firmware
-  --kext-src    Raphaeli.kext to copy (default: out/Raphaeli.kext next to
-                this script)
+  --kext-src    single Raphaeli.kext bundle to copy (explicit override)
+  --target      target macOS variant: sequoia or tahoe
 
 Linux path (no macOS needed):
   python3 oc-install.py /media/user/EFI --add
   python3 oc-install.py /dev/sda1 --status --system-root /mnt/target
 
---add       backup config.plist, copy the kext into EFI/OC/Kexts/, insert a
-            Kernel>Add entry (Enabled true, MinKernel 23.4.0). Adds NO
+--add       backup config.plist, copy the selected kext into EFI/OC/Kexts/,
+            insert or update a Kernel>Add entry. Adds NO
             boot-arg: the kext loads but stays inert until --enable.
 --enable    append raphaeli-amd=1 to NVRAM>Add>7C43...:boot-args (idempotent)
 --disable   strip raphaeli-amd=1 from boot-args (kext loads but parks)
@@ -51,7 +51,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
-from typing import Any, NoReturn
+from typing import Any, NamedTuple, NoReturn
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # stage.sh lives next to us in the dist zip (tools/fw/stage.sh) or in the dev
@@ -70,7 +70,10 @@ VOL = ""
 CONFIG = ""
 KEXTS_DIR = ""
 SYS_ROOT = "/"
+SYSTEM_ROOT_SET = False
 FW_SRC = ""
+TARGET_SELECTOR = ""
+KEXT_SRC_EXPLICIT = bool(os.environ.get("RAPHAELI_KEXT"))
 # kext source: dist zip layout (kext/ next to tools/), then dev-tree layout
 # (out/Raphaeli.kext at the repo root). Override: --kext-src
 # or $RAPHAELI_KEXT.
@@ -82,6 +85,45 @@ def _default_kext_src():
     return os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME)
 
 KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or _default_kext_src()
+
+class TargetInfo(NamedTuple):
+    name: str
+    source_bundle: str
+    min_kernel: str
+    max_kernel: str
+
+TARGETS = {
+    "sequoia": ("Sequoia", "24.0.0", "24.99.99"),
+    "tahoe": ("Tahoe", "25.0.0", "25.99.99"),
+}
+
+def resolve_target(explicit: str, system_root: str, package_root: str) -> TargetInfo:
+    selector = explicit.strip().lower()
+    if selector:
+        metadata = TARGETS.get(selector)
+        if metadata is None:
+            die(f"unsupported target {explicit!r}; use --target sequoia or --target tahoe")
+    else:
+        if not system_root:
+            die("target is required: pass --target sequoia|tahoe or --system-root <mounted system volume>")
+        version_path = os.path.join(system_root, "System", "Library", "CoreServices", "SystemVersion.plist")
+        try:
+            with open(version_path, "rb") as f:
+                version = plistlib.load(f).get("ProductVersion", "")
+        except (OSError, plistlib.InvalidFileException, ValueError) as e:
+            die(f"cannot read ProductVersion from {version_path}: {e}")
+        match = re.match(r"^(\d+)(?:\.|$)", version if isinstance(version, str) else "")
+        major = int(match.group(1)) if match else -1
+        if major == 15:
+            selector = "sequoia"
+        elif major == 26:
+            selector = "tahoe"
+        else:
+            die(f"unsupported ProductVersion {version!r}; supported versions are 15.x (Sequoia) and 26.x (Tahoe)")
+        metadata = TARGETS[selector]
+    name, minimum, maximum = metadata
+    source = os.path.join(package_root, "target", name, KEXT_NAME)
+    return TargetInfo(name, os.path.normpath(source), minimum, maximum)
 
 
 def die(msg: str) -> NoReturn:
@@ -346,10 +388,16 @@ def copy_kext(src: str, dst: str) -> None:
 
 
 def action_add() -> None:
-    if not os.path.isdir(os.path.join(KEXT_SRC, "Contents")):
-        die(f"not a kext bundle: {KEXT_SRC}")
-    if not os.path.isfile(os.path.join(KEXT_SRC, "Contents", "Info.plist")):
-        die(f"kext bundle missing Contents/Info.plist: {KEXT_SRC}")
+    package_root = os.path.dirname(SCRIPT_DIR)
+    if KEXT_SRC_EXPLICIT and not TARGET_SELECTOR and not SYSTEM_ROOT_SET:
+        target = TargetInfo("", KEXT_SRC, "23.4.0", "")
+    else:
+        target = resolve_target(TARGET_SELECTOR, SYS_ROOT if SYSTEM_ROOT_SET else "", package_root)
+    source = KEXT_SRC if KEXT_SRC_EXPLICIT else target.source_bundle
+    if not os.path.isdir(os.path.join(source, "Contents")):
+        die(f"not a kext bundle: {source}")
+    if not os.path.isfile(os.path.join(source, "Contents", "Info.plist")):
+        die(f"kext bundle missing Contents/Info.plist: {source}")
     cfg = load_config()
     idx = find_entry_index(cfg)
     if idx is not None:
@@ -358,8 +406,10 @@ def action_add() -> None:
         if entry.get("Comment") != KEXT_NAME:
             log(f"refreshing Comment -> {KEXT_NAME!r}")
             entry["Comment"] = KEXT_NAME
+            entry["MinKernel"] = target.min_kernel
+            entry["MaxKernel"] = target.max_kernel
             if DRY_RUN:
-                print(f"DRY-RUN: set :Kernel:Add:{idx}:Comment = {KEXT_NAME}")
+                print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
             else:
                 save_config(cfg)
         enabled = entry.get("Enabled")
@@ -386,8 +436,8 @@ def action_add() -> None:
             "Comment": KEXT_NAME,
             "Enabled": True,
             "ExecutablePath": "Contents/MacOS/Raphaeli",
-            "MaxKernel": "",
-            "MinKernel": "23.4.0",
+            "MaxKernel": target.max_kernel,
+            "MinKernel": target.min_kernel,
             "PlistPath": "Contents/Info.plist",
         }
         log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
@@ -396,7 +446,7 @@ def action_add() -> None:
         else:
             add.append(entry)
             save_config(cfg)
-    copy_kext(KEXT_SRC, os.path.join(KEXTS_DIR, KEXT_NAME))
+    copy_kext(source, os.path.join(KEXTS_DIR, KEXT_NAME))
     stage_firmware()
     if not DRY_RUN:
         validate_config()
@@ -499,7 +549,8 @@ OC boot-menu safety:
 
 
 def main(argv: "list[str]") -> int:
-    global DRY_RUN, SYS_ROOT, FW_SRC, KEXT_SRC
+    global DRY_RUN, SYS_ROOT, SYSTEM_ROOT_SET, FW_SRC, KEXT_SRC
+    global TARGET_SELECTOR, KEXT_SRC_EXPLICIT
     actions = {"--add": "add", "--enable": "enable", "--disable": "disable",
                "--remove": "remove", "--status": "status"}
     action = "status"
@@ -511,7 +562,7 @@ def main(argv: "list[str]") -> int:
             action = actions[a]
         elif a == "--dry-run":
             DRY_RUN = True
-        elif a in ("--firmware-src", "--system-root", "--kext-src"):
+        elif a in ("--firmware-src", "--system-root", "--kext-src", "--target"):
             if i + 1 >= len(argv):
                 die(f"{a} needs an argument")
             val = argv[i + 1]
@@ -520,8 +571,12 @@ def main(argv: "list[str]") -> int:
                 FW_SRC = val
             elif a == "--system-root":
                 SYS_ROOT = val
+                SYSTEM_ROOT_SET = True
+            elif a == "--target":
+                TARGET_SELECTOR = val
             else:
                 KEXT_SRC = val
+                KEXT_SRC_EXPLICIT = True
         elif a in ("-h", "--help"):
             usage()
             return 0
