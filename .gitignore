@@ -1,5 +1,6 @@
 # Reference-only source trees (never commit)
 research/
+.worktrees/
 
 # Build workspaces and artifacts
 work-*/

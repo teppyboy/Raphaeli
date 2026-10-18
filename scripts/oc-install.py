@@ -348,27 +348,62 @@ def firmware_status() -> None:
             print(f"  --firmware-src {FW_SRC} census OK ({len(REQUIRED_FW)}/{len(REQUIRED_FW)})")
 
 
-def stage_firmware() -> None:
+def stage_firmware() -> "tuple[str, str]":
+    """Stage firmware privately, then publish it as one replaceable tree.
+
+    The returned (root, old) pair remains a transaction until the caller calls
+    finish_firmware(). A later config or kext failure can therefore restore the
+    pre-existing firmware tree instead of leaving a partial install behind.
+    """
     if not FW_SRC:
-        return
+        return "", ""
     if not os.path.isdir(FW_SRC):
         die(f"--firmware-src not a directory: {FW_SRC}")
     missing = [f for f in REQUIRED_FW if not os.path.isfile(os.path.join(FW_SRC, f))]
     if missing:
         die(f"{len(missing)} required firmware blob(s) missing in {FW_SRC} (see fw/stage.sh)")
     fwroot = os.path.join(SYS_ROOT, "Library", "Raphaeli", "firmware")
+    temporary = fwroot + ".raphaeli-staging"
+    old = fwroot + ".raphaeli-old"
     log(f"staging firmware -> {fwroot}")
     if DRY_RUN:
         print("DRY-RUN: mkdir -p", fwroot)
         print("DRY-RUN: sh", FW_STAGE_SH, FW_SRC, fwroot)
-        return
+        return "", ""
+    if os.path.exists(temporary) or os.path.exists(old):
+        die(f"firmware transaction paths already exist beside {fwroot}; remove them manually")
+    moved_old = False
     try:
-        os.makedirs(fwroot, exist_ok=True)
-        r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, fwroot])
-    except OSError as e:
-        die(f"firmware staging failed: {e}")
-    if r.returncode != 0:
-        die("fw/stage.sh failed")
+        # stage.sh may copy many blobs and fail part-way through. It only ever
+        # sees the private tree, never the live firmware directory.
+        r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, temporary])
+        if r.returncode != 0:
+            die("fw/stage.sh failed")
+        if os.path.exists(fwroot):
+            os.replace(fwroot, old)
+            moved_old = True
+        os.replace(temporary, fwroot)
+    except BaseException:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        if moved_old and not os.path.exists(fwroot) and os.path.exists(old):
+            os.replace(old, fwroot)
+        raise
+    return fwroot, old if moved_old else ""
+
+def finish_firmware(state: "tuple[str, str]") -> None:
+    _root, old = state
+    if old and os.path.exists(old):
+        remove_path(old)
+
+def rollback_firmware(state: "tuple[str, str]") -> None:
+    root, old = state
+    if not root:
+        return
+    if os.path.exists(root):
+        remove_path(root)
+    if old and os.path.exists(old):
+        os.replace(old, root)
 
 
 # ---- actions -------------------------------------------------------------------
@@ -489,14 +524,16 @@ def action_add() -> None:
     cfg = load_config()
     indices = find_entry_indices(cfg)
     idx = indices[0] if indices else None
+    # Reject disabled existing entries before staging firmware or touching EFI.
+    if idx is not None:
+        enabled = cfg["Kernel"]["Add"][idx].get("Enabled")
+        if enabled is not True:
+            die(f"existing entry has Enabled={enabled}; fix config.plist manually")
     staged = os.path.join(KEXTS_DIR, KEXT_NAME)
     if DRY_RUN:
         if idx is not None:
             log(f"config entry already present at Kernel>Add:{idx}")
-            entry = cfg["Kernel"]["Add"][idx]
-            if entry.get("Enabled") is not True:
-                die(f"existing entry has Enabled={entry.get('Enabled')}; fix config.plist manually")
-            print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
+            print(f"DRY-RUN: refresh :Kernel>Add:{idx} for {target.name}")
         else:
             ts = datetime.now().strftime("%Y%m%d-%H%M%S")
             backup = f"{CONFIG}.raphaeli-backup-{ts}"
@@ -511,66 +548,65 @@ def action_add() -> None:
     with open(CONFIG, "rb") as stream:
         original_config = stream.read()
     temporary = prepare_staged_kext(source, staged, target)
+    firmware_state = ("", "")
     try:
-        stage_firmware()
+        firmware_state = stage_firmware()
     except BaseException:
         if os.path.exists(temporary):
             remove_path(temporary)
         raise
 
+    # Keep a restorable original before mutating bounds, comments, duplicates,
+    # or inserting a new entry. The backup is part of the install contract.
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = f"{CONFIG}.raphaeli-backup-{ts}"
+    log(f"backing up config.plist -> {os.path.basename(backup)}")
+    try:
+        shutil.copy2(CONFIG, backup)
+    except OSError as e:
+        remove_path(temporary)
+        rollback_firmware(firmware_state)
+        die(f"cannot back up {CONFIG}: {e}")
+
     changed = False
-    if idx is not None:
-        log(f"config entry already present at Kernel>Add:{idx}")
-        entry = cfg["Kernel"]["Add"][idx]
-        enabled = entry.get("Enabled")
-        if enabled is not True:
-            remove_path(temporary)
-            die(f"existing entry has Enabled={enabled}; fix config.plist manually")
-        if entry.get("Comment") != KEXT_NAME:
-            log(f"refreshing Comment -> {KEXT_NAME!r}")
-            entry["Comment"] = KEXT_NAME
-            changed = True
-        if entry.get("MinKernel") != target.min_kernel or entry.get("MaxKernel") != target.max_kernel:
-            entry["MinKernel"] = target.min_kernel
-            entry["MaxKernel"] = target.max_kernel
-            changed = True
-        if len(indices) > 1:
-            log(f"removing {len(indices) - 1} duplicate Kernel>Add entries")
-            for duplicate in reversed(indices[1:]):
-                cfg["Kernel"]["Add"].pop(duplicate)
-            changed = True
-    else:
-        kernel = cfg.setdefault("Kernel", {})
-        add = kernel.get("Add")
-        if not isinstance(add, list):
-            if add is not None:
-                remove_path(temporary)
-                die(":Kernel:Add exists but is not an array")
-            log("creating missing Kernel>Add array")
-            add = kernel["Add"] = []
-        entry = {
-            "Arch": "x86_64", "BundlePath": KEXT_NAME, "Comment": KEXT_NAME,
-            "Enabled": True, "ExecutablePath": "Contents/MacOS/Raphaeli",
-            "MaxKernel": target.max_kernel, "MinKernel": target.min_kernel,
-            "PlistPath": "Contents/Info.plist",
-        }
-        log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
-        add.append(entry)
-        changed = True
-
-    if changed and idx is None:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = f"{CONFIG}.raphaeli-backup-{ts}"
-        log(f"backing up config.plist -> {os.path.basename(backup)}")
-        try:
-            shutil.copy2(CONFIG, backup)
-        except OSError as e:
-            remove_path(temporary)
-            die(f"cannot back up {CONFIG}: {e}")
-
     old = ""
     committed = False
     try:
+        if idx is not None:
+            log(f"config entry already present at Kernel>Add:{idx}")
+            entry = cfg["Kernel"]["Add"][idx]
+            if entry.get("Comment") != KEXT_NAME:
+                log(f"refreshing Comment -> {KEXT_NAME!r}")
+                entry["Comment"] = KEXT_NAME
+                changed = True
+            if entry.get("MinKernel") != target.min_kernel or entry.get("MaxKernel") != target.max_kernel:
+                entry["MinKernel"] = target.min_kernel
+                entry["MaxKernel"] = target.max_kernel
+                changed = True
+            if len(indices) > 1:
+                log(f"removing {len(indices) - 1} duplicate Kernel>Add entries")
+                for duplicate in reversed(indices[1:]):
+                    cfg["Kernel"]["Add"].pop(duplicate)
+                changed = True
+        else:
+            kernel = cfg.setdefault("Kernel", {})
+            add = kernel.get("Add")
+            if not isinstance(add, list):
+                if add is not None:
+                    remove_path(temporary)
+                    die(":Kernel:Add exists but is not an array")
+                log("creating missing Kernel>Add array")
+                add = kernel["Add"] = []
+            entry = {
+                "Arch": "x86_64", "BundlePath": KEXT_NAME, "Comment": KEXT_NAME,
+                "Enabled": True, "ExecutablePath": "Contents/MacOS/Raphaeli",
+                "MaxKernel": target.max_kernel, "MinKernel": target.min_kernel,
+                "PlistPath": "Contents/Info.plist",
+            }
+            log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
+            add.append(entry)
+            changed = True
+
         old = commit_staged_kext(temporary, staged)
         committed = True
         if changed:
@@ -583,7 +619,11 @@ def action_add() -> None:
                 remove_path(staged)
             if old and os.path.exists(old):
                 os.replace(old, staged)
+        elif os.path.exists(temporary):
+            remove_path(temporary)
+        rollback_firmware(firmware_state)
         raise
+    finish_firmware(firmware_state)
     validate_config()
 
 
@@ -619,30 +659,55 @@ def action_disable() -> None:
 def action_remove() -> None:
     cfg = load_config()
     indices = find_entry_indices(cfg)
+    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
     if indices:
         log(f"deleting {len(indices)} Kernel>Add entr{'y' if len(indices) == 1 else 'ies'} ({KEXT_NAME})")
-        if DRY_RUN:
-            print(f"DRY-RUN: delete :Kernel:Add entries {indices}")
+    else:
+        log(f"no Kernel>Add entry for {KEXT_NAME} (nothing to delete)")
+    if DRY_RUN:
+        if indices:
+            print(f"DRY-RUN: delete :Kernel>Add entries {indices}")
+        if os.path.exists(staged):
+            print("DRY-RUN: rm -rf", staged)
         else:
+            log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
+        log("backups (config.plist.raphaeli-backup-*) are kept")
+        return
+
+    with open(CONFIG, "rb") as stream:
+        original_config = stream.read()
+    kext_backup = staged + ".raphaeli-remove"
+    if os.path.exists(kext_backup):
+        die(f"remove transaction path already exists: {kext_backup}")
+    copied = False
+    try:
+        # Delete the live bundle before config commit. A private copy makes that
+        # destructive step reversible if the later atomic config write fails.
+        if os.path.exists(staged):
+            shutil.copytree(staged, kext_backup, symlinks=True)
+            copied = True
+            shutil.rmtree(staged)
+        else:
+            log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
+        if indices:
             for idx in reversed(indices):
                 cfg["Kernel"]["Add"].pop(idx)
             save_config(cfg)
-    else:
-        log(f"no Kernel>Add entry for {KEXT_NAME} (nothing to delete)")
-    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
-    if os.path.exists(staged):
-        if DRY_RUN:
-            print("DRY-RUN: rm -rf", staged)
-        else:
-            try:
-                shutil.rmtree(staged)
-            except OSError as e:
-                die(f"cannot remove {staged}: {e}")
-    else:
-        log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
+        if copied and os.path.exists(kext_backup):
+            remove_path(kext_backup)
+    except BaseException:
+        try:
+            restore_config_bytes(original_config)
+            if copied and not os.path.exists(staged) and os.path.exists(kext_backup):
+                shutil.copytree(kext_backup, staged, symlinks=True)
+        except BaseException:
+            raise
+        finally:
+            if os.path.exists(kext_backup):
+                remove_path(kext_backup)
+        raise
     log("backups (config.plist.raphaeli-backup-*) are kept")
-    if not DRY_RUN:
-        validate_config()
+    validate_config()
 
 
 def status_target(cfg: "dict") -> "tuple[str, str, str]":

@@ -27,12 +27,11 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "build.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
-# Tahoe accelerator objects require private ABI declarations generated from the matching Tahoe SDK/KC.
-# Reject before any target (including Sequoia in --target all) starts, preventing partial artifacts.
+# Tahoe forwarding is generated from tracked source, but the pinned ABI (26.7.1) is not
+# validated against the audited 26.6.2/25G83 target. Preflight all before creating outputs.
 if [ "$TARGET_SELECTOR" = tahoe ] || [ "$TARGET_SELECTOR" = all ]; then
-    TAHOE_ABI_HEADER="$X/research/tahoe-forwarding/nmx_accel_tahoe_forwarding.h"
-    [ -f "$TAHOE_ABI_HEADER" ] || {
-        echo "build.sh: refusing $TARGET_SELECTOR before compiling; missing matching Tahoe ABI header $TAHOE_ABI_HEADER" >&2
+    python3 "$X/scripts/prepare-accel-sources.py" --target tahoe --check-only 2>&1 || {
+        echo "build.sh: refusing $TARGET_SELECTOR before compiling; missing matching Tahoe ABI header (exact target audit required)" >&2
         exit 1
     }
 fi
@@ -50,6 +49,9 @@ build_target() {
     target=$1
     case "$target" in sequoia) name=Sequoia ;; tahoe) name=Tahoe ;; esac
     obj="$X/obj/target/$name"; log="$X/logs/target/$name"
+    ACCEL_HEADERS="$obj/accel-headers"
+    python3 "$X/scripts/prepare-accel-sources.py" --target "$target" --output "$ACCEL_HEADERS" || exit 1
+    export NMX_ACCEL_HEADERS="$ACCEL_HEADERS"
     mkdir -p "$obj" "$log"
     rm -f "$log"/*.log "$log"/*.failed
     n=$(wc -l < srcs.txt | tr -d ' ')

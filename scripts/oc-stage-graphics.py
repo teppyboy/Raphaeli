@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 FAMILIES = ("IOGraphicsFamily", "IOAcceleratorFamily2")
-DIRECTORY = "RaphaeliDependencies"
+DIRECTORY = "Raphaeli.kext/Contents/PlugIns"
 
 
 def plist(path):
@@ -52,12 +52,13 @@ def prepare(efi, recovery, kdk):
     raphaeli = [i for i, entry in enumerate(add) if entry.get("BundlePath") == "Raphaeli.kext"]
     if len(raphaeli) != 1 or add[raphaeli[0]].get("Enabled") is not True:
         raise ValueError("Require exactly one enabled Raphaeli.kext entry")
-    destination = efi / "EFI/OC/Kexts" / DIRECTORY
+    destination = efi / "EFI/OC/Kexts" / "Raphaeli.kext" / "Contents" / "PlugIns"
     if destination.exists() or destination.is_symlink():
         raise ValueError("Dependency staging directory already exists: " + str(destination))
     for entry in add + cfg["Kernel"].get("Force", []):
         path = entry.get("BundlePath", "").replace("\\", "/")
-        if DIRECTORY in path.split("/") or path.split("/")[-1] in [n + ".kext" for n in FAMILIES]:
+        if (path.startswith(DIRECTORY + "/")
+                or path.split("/")[-1] in [n + ".kext" for n in FAMILIES]):
             raise ValueError("Existing graphics dependency entry; inspect manually: " + path)
     entries, sources = [], []
     # Restrict this experimental dependency set to the exact Darwin minor under test.

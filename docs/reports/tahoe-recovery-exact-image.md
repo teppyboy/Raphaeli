@@ -29,6 +29,14 @@ user upload is needed to reproduce that image. Read-only mount reveals:
 Previous inference "26.6" from the booter's SDK metadata did not identify the
 actual Recovery patch version. Corrected by inspecting SystemVersion.plist.
 
+## Scope and ABI boundary
+
+This exact 26.6.2 / 25G83 image validates Recovery/KDK dependency injection
+behavior only. It does **not** validate the private accelerator forwarding ABI;
+the available forwarding source is from 26.7.1. Tahoe source, runtime, and link
+builds therefore remain intentionally blocked. Do not set `tahoe_target_validated=yes`
+or treat this prelink experiment as a Tahoe build success.
+
 ## Where the families really live
 
 `kmutil inspect -B <Recovery Boot KC> -S <Recovery BaseSystem KC>
@@ -84,7 +92,7 @@ python3 scripts/oc-stage-graphics.py /Volumes/EFI \
 - Requires one enabled Raphaeli entry and no existing/conflicting family entry.
 - Verifies Recovery/KDK build, x86_64 family UUIDs against the Recovery KCs,
   and CFBundleVersion against their metadata.
-- Stages normalized dependency bundles at EFI/OC/Kexts/RaphaeliDependencies.
+- Stages dependency bundles inside `EFI/OC/Kexts/Raphaeli.kext/Contents/PlugIns/`.
 - Inserts IOGraphicsFamily then IOAcceleratorFamily2 immediately before Raphaeli.
 - Restricts new entries to the tested Darwin minor (25.6.0–25.6.99).
 - Creates a unique original-config backup before atomically updating config.
@@ -93,7 +101,7 @@ python3 scripts/oc-stage-graphics.py /Volumes/EFI \
 - Leaves boot args, NVRAM, other entries, and driver Recovery attachment intact.
 
 Rollback: restore the printed config backup, then remove the newly staged
-RaphaeliDependencies directory. Revalidate after **any** OS/Recovery update;
+`Raphaeli.kext/Contents/PlugIns/` directory. Revalidate after **any** OS/Recovery update;
 Darwin minor constraints cannot distinguish every patch build.
 
 Normalized bundles staged by the tool also pass the real OC gate against the

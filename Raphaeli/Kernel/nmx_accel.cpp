@@ -222,6 +222,13 @@ OSObject *RaphaeliAccel::newDisplayMachine()
     return d;
 }
 
+#if defined(NM_TAHOE)
+OSObject *RaphaeliAccel::newDisplayPipe()
+{
+    return OSTypeAlloc(RaphaeliDisplayPipe);
+}
+#endif
+
 OSObject *RaphaeliAccel::newGLContext()    { RaphaeliGLContext *c = OSTypeAlloc(RaphaeliGLContext); return c; }
 OSObject *RaphaeliAccel::newCLContext()    { RaphaeliCLContext *c = OSTypeAlloc(RaphaeliCLContext); return c; }
 OSObject *RaphaeliAccel::newSurface()      { RaphaeliSurface *s = OSTypeAlloc(RaphaeliSurface); return s; }

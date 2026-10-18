@@ -81,16 +81,18 @@ PASSED. `python3 -m py_compile oc-install.py` clean.
 
 ## Task 2 fix round 2
 
-Existing-entry refresh is transactional. `--add` now prepares and stamps a sibling
-staging bundle, validates firmware staging, then updates `config.plist` and swaps
-the staged bundle. Existing staged bundles remain in a temporary rollback path
-until config commit succeeds; config bytes and the old bundle are restored on
-commit failure. Existing-entry refresh does not create a new backup, preserving
-prior backup semantics; new entries still create the original-config backup.
+Existing-entry refresh is transactional. `--add` now rejects a disabled existing
+entry before firmware staging, creates a config backup before changing bounds,
+comments, duplicates, or insertion, prepares and stamps a sibling staging
+bundle, validates firmware staging, then updates `config.plist` and swaps the
+staged bundle. Existing staged bundles remain in a temporary rollback path until
+config commit succeeds; config bytes and the old bundle are restored on commit
+failure. The backup preserves the exact pre-mutation config for every `--add`.
 
-Regression coverage simulates a copy failure while an existing entry and staged
-bundle are present, asserting both remain byte-for-byte unchanged and no staging
-residue remains.
+Regression coverage verifies backup fidelity for an existing-entry bounds
+refresh, rejects disabled entries before firmware staging, and simulates a copy
+failure while an existing entry and staged bundle are present, asserting both
+remain byte-for-byte unchanged and no staging residue remains.
 
 Validation:
 

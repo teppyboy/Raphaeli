@@ -20,11 +20,11 @@ selected entries now use Darwin 24.x or 25.x bounds.
 
 ## MacKernelSDK
 
-Compiler wrappers source `scripts/kernel-sdk.sh`. `MAC_KERNEL_SDK` overrides
-the SDK root; otherwise `research/MacKernelSDK` is selected when present.
-Headers and pinned kmod library directories are used for kernel compilation and
-linking. Missing SDK roots emit an explicit warning before falling back to the
-active `xcrun --sdk macosx` SDK.
+Compiler wrappers source `scripts/kernel-sdk.sh`. The default
+`research/MacKernelSDK` checkout and any `MAC_KERNEL_SDK` override must resolve
+to pinned commit `3f750085caa17ec3a7880f11c11bf4f48cd6a164`, with its Headers
+and kmod library directories present. Missing, non-Git, or different revisions
+fail closed; the active `xcrun --sdk macosx` SDK is never used as a fallback.
 
 The Sequoia research checkout was copied into this worktree from the parent
 research tree: `research/MacKernelSDK`, `research/nvidia-macos-driver`, and
@@ -36,8 +36,9 @@ header.
 
 - `bash -n` on changed shell wrappers and tests: passed.
 - `python3 -m py_compile scripts/oc-install.py`: passed.
-- `scripts/tests/mac_kernel_sdk_test.sh`: passed; all six compiler wrappers plus `kext-build.sh` and `link.sh` are checked for selected SDK include/library use, and all Sequoia accelerator headers are present.
+- `scripts/tests/mac_kernel_sdk_test.sh`: passed; all six compiler wrappers plus `kext-build.sh` and `link.sh` are checked for selected SDK include/library use, exact SDK commit pinning, fail-closed missing/invalid overrides, and all Sequoia accelerator headers.
 - `scripts/oc-install.test.sh`: passed, including explicit `--kext-src` rejection without `--target`/`--system-root`.
 - `scripts/recovery-install.test.sh`: passed (74 checks), including packaged `tools/fw/stage.sh` resolution/failure and target bundle selection.
-- `./scripts/build.sh --target sequoia`: passed (900/900).
-- `./scripts/rt.sh --target sequoia`: blocked by four pre-existing runtime compile errors (`strnstr` declaration and missing `ACCELLOG`), unrelated to packaging/SDK selection.
+- `./scripts/build.sh --target sequoia`: passed (`900/900`, failed `0`).
+- `./scripts/rt.sh --target sequoia`: passed (`81`, failed `0`).
+- Tahoe build/runtime/link remain intentionally blocked until exact 26.6.2/25G83 ABI validation.

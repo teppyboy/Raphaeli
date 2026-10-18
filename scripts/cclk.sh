@@ -11,7 +11,9 @@ src=$1; shift
 OBJ_ROOT=${NMX_OBJ_ROOT:-$X/lkobj}
 target_flags=""
 case "${NMX_TARGET:-sequoia}:$(basename "$src")" in
-  tahoe:nmx_accel*) target_flags="-DNM_TAHOE" ;;
+  tahoe:nmx_accel*)
+    [ -n "${NMX_ACCEL_HEADERS:-}" ] || { echo "cclk.sh: Tahoe accelerator headers not prepared" >&2; exit 1; }
+    target_flags="-DNM_TAHOE -I$NMX_ACCEL_HEADERS" ;;
 esac
 exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \

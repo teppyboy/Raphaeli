@@ -24,9 +24,9 @@ assert_grep 'OUT_TARGET=.*OUT' "$ROOT/scripts/link.sh" "legacy bundle stays at r
 assert_grep 'OUT_TARGET="\$OUT/target/\$name"' "$ROOT/scripts/link.sh" "target bundle uses isolated output path"
 assert_grep 'OUT_TARGET="\$OUT"' "$ROOT/scripts/link.sh" "legacy bundle uses output root"
 assert_grep 'LOG_DIR=.*OUT_TARGET' "$ROOT/scripts/link.sh" "link logs live under target output"
-assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/build.sh" "build rejects Tahoe before compilation"
-assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/rt.sh" "rt rejects Tahoe before compilation"
-assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/link.sh" "link rejects Tahoe before linking"
+assert_grep 'exact target audit required' "$ROOT/scripts/build.sh" "build rejects unvalidated Tahoe before compilation"
+assert_grep 'exact Tahoe ABI audit required' "$ROOT/scripts/rt.sh" "rt rejects unvalidated Tahoe before compilation"
+assert_grep 'exact Tahoe ABI audit required' "$ROOT/scripts/link.sh" "link rejects unvalidated Tahoe before linking"
 
 # Duplicate selectors reject before any build or link work.
 for script in build.sh rt.sh link.sh; do
@@ -44,7 +44,7 @@ for script in build.sh rt.sh link.sh; do
   if GPU_SRC_ROOT="$TMP/$script.all-output" "$ROOT/scripts/$script" --target all >"$TMP/$script.all.log" 2>&1; then
     bad "$script rejects incomplete all"
   else
-    grep -Fq -- 'missing matching Tahoe ABI header' "$TMP/$script.all.log" && ok "$script rejects incomplete all" || bad "$script rejects incomplete all"
+    grep -Fq -- 'audit required' "$TMP/$script.all.log" && ok "$script rejects incomplete all" || bad "$script rejects incomplete all"
     [ ! -e "$TMP/$script.all-output/obj" ] && [ ! -e "$TMP/$script.all-output/out" ] && ok "$script all leaves no partial artifacts" || bad "$script all leaves no partial artifacts"
   fi
 done
@@ -62,7 +62,7 @@ chmod 755 "$TMP/bin/xcrun"
 for target in sequoia tahoe; do
   : > "$TMP/commands-$target.log"
   if PATH="$TMP/bin:$PATH" NMX_COMMAND_LOG="$TMP/commands-$target.log" NMX_TARGET="$target" NMX_OBJ="$TMP/obj/$target.o" \
-      GPU_SRC_ROOT="$ROOT" "$ROOT/scripts/ccxx.sh" "$TMP/nmx_accel.cpp"; then
+      NMX_ACCEL_HEADERS="$TMP" GPU_SRC_ROOT="$ROOT" "$ROOT/scripts/ccxx.sh" "$TMP/nmx_accel.cpp"; then
     if [ "$target" = tahoe ]; then
       grep -Fq -- '-DNM_TAHOE' "$TMP/commands-$target.log" && ok "Tahoe command has NM_TAHOE" || bad "Tahoe command has NM_TAHOE"
       ! grep -Fq -- '-DNM_TAHOE' "$TMP/commands-sequoia.log" && ok "Sequoia command omits NM_TAHOE" || bad "Sequoia command omits NM_TAHOE"

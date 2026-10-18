@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -149,6 +150,44 @@ class TargetResolutionTest(unittest.TestCase):
         entry = plistlib.loads(config.read_bytes())["Kernel"]["Add"][0]
         self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
         self.assertEqual(entry["CustomField"], "preserve-me")
+        backups = list(config.parent.glob("config.plist.raphaeli-backup-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0].read_bytes(), plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext", "Comment": "Raphaeli.kext", "Enabled": True,
+            "MinKernel": "23.4.0", "MaxKernel": "23.99.99", "CustomField": "preserve-me",
+        }]}}))
+
+    def test_disabled_existing_entry_rejected_before_firmware_staging(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext", "Enabled": False,
+        }]}}))
+        old_stage = oc_install.stage_firmware
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+                      oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+                      oc_install.SYSTEM_ROOT_SET, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(self.efi / "EFI" / "OC" / "Kexts")
+            oc_install.KEXT_SRC = str(self.package / "target" / "Tahoe" / "Raphaeli.kext")
+            oc_install.KEXT_SRC_EXPLICIT = True
+            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.SYSTEM_ROOT_SET = False
+            oc_install.DRY_RUN = False
+            def unexpected_firmware_stage():
+                raise AssertionError("firmware staging must not run for disabled entry")
+            oc_install.stage_firmware = unexpected_firmware_stage
+            with self.assertRaises(SystemExit):
+                oc_install.action_add()
+        finally:
+            oc_install.stage_firmware = old_stage
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+             oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+             oc_install.SYSTEM_ROOT_SET, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext", "Enabled": False,
+        }]}}))
+        self.assertFalse((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext").exists())
 
     def test_existing_entry_copy_failure_preserves_config_and_staged_bundle(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
@@ -188,6 +227,109 @@ class TargetResolutionTest(unittest.TestCase):
             staged_before,
         )
         self.assertFalse((staged.parent / "Raphaeli.kext.raphaeli-staging").exists())
+
+    def test_firmware_stage_failure_leaves_no_partial_install(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        before = config.read_bytes()
+        source = self.root / "firmware-source"
+        source.mkdir()
+        for name in oc_install.REQUIRED_FW:
+            (source / name).write_bytes(b"firmware")
+        stage = self.root / "stage-fails.sh"
+        stage.write_text("#!/bin/sh\nmkdir -p \\\"$2/amdgpu\\\"\ncp \\\"$1/" + oc_install.REQUIRED_FW[0] + "\\\" \\\"$2/amdgpu/\\\"\nexit 1\n")
+        stage.chmod(0o755)
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+                      oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+                      oc_install.SYSTEM_ROOT_SET, oc_install.SYS_ROOT, oc_install.FW_SRC,
+                      oc_install.FW_STAGE_SH, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(self.efi / "EFI/OC/Kexts")
+            oc_install.KEXT_SRC = str(self.package / "target/Tahoe/Raphaeli.kext")
+            oc_install.KEXT_SRC_EXPLICIT = True
+            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.SYSTEM_ROOT_SET = False
+            oc_install.SYS_ROOT = str(self.root / "system")
+            oc_install.FW_SRC = str(source)
+            oc_install.FW_STAGE_SH = str(stage)
+            oc_install.DRY_RUN = False
+            with self.assertRaises(SystemExit):
+                oc_install.action_add()
+        finally:
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+             oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+             oc_install.SYSTEM_ROOT_SET, oc_install.SYS_ROOT, oc_install.FW_SRC,
+             oc_install.FW_STAGE_SH, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), before)
+        self.assertFalse((self.efi / "EFI/OC/Kexts/Raphaeli.kext").exists())
+        self.assertFalse((self.root / "system/Library/Raphaeli/firmware").exists())
+        self.assertFalse((self.root / "system/Library/Raphaeli/firmware.raphaeli-staging").exists())
+
+    def test_config_commit_failure_rolls_back_firmware_and_kext(self):
+        config = self.efi / "EFI/OC/config.plist"
+        before = config.read_bytes()
+        source = self.root / "firmware-source"
+        source.mkdir()
+        for name in oc_install.REQUIRED_FW:
+            (source / name).write_bytes(b"firmware")
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+                      oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+                      oc_install.SYSTEM_ROOT_SET, oc_install.SYS_ROOT, oc_install.FW_SRC,
+                      oc_install.FW_STAGE_SH, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(self.efi / "EFI/OC/Kexts")
+            oc_install.KEXT_SRC = str(self.package / "target/Tahoe/Raphaeli.kext")
+            oc_install.KEXT_SRC_EXPLICIT = True
+            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.SYSTEM_ROOT_SET = False
+            oc_install.SYS_ROOT = str(self.root / "system")
+            oc_install.FW_SRC = str(source)
+            oc_install.FW_STAGE_SH = str(ROOT / "Raphaeli/Firmware/stage.sh")
+            oc_install.DRY_RUN = False
+            with patch.object(oc_install, "save_config", side_effect=OSError("simulated config failure")), \
+                    self.assertRaises(OSError):
+                oc_install.action_add()
+        finally:
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+             oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+             oc_install.SYSTEM_ROOT_SET, oc_install.SYS_ROOT, oc_install.FW_SRC,
+             oc_install.FW_STAGE_SH, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), before)
+        self.assertFalse((self.efi / "EFI/OC/Kexts/Raphaeli.kext").exists())
+        firmware_root = self.root / "system/Library/Raphaeli/firmware"
+        self.assertFalse(firmware_root.exists())
+        self.assertFalse((self.root / "system/Library/Raphaeli/firmware.raphaeli-staging").exists())
+
+    def test_remove_failure_preserves_config_and_staged_kext(self):
+        config = self.efi / "EFI/OC/config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [
+            {"BundlePath": "Raphaeli.kext", "Enabled": True}]}}))
+        staged = self.efi / "EFI/OC/Kexts/Raphaeli.kext"
+        self._make_kext(staged)
+        before = config.read_bytes()
+        staged_before = {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()}
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(staged.parent)
+            oc_install.DRY_RUN = False
+            real_rmtree = oc_install.shutil.rmtree
+            def fail_staged(path, *args, **kwargs):
+                if path == str(staged):
+                    raise OSError("simulated delete failure")
+                return real_rmtree(path, *args, **kwargs)
+            with patch.object(oc_install.shutil, "rmtree", side_effect=fail_staged), \
+                    self.assertRaises(OSError):
+                oc_install.action_remove()
+        finally:
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), before)
+        self.assertEqual(
+            {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()},
+            staged_before,
+        )
+        self.assertFalse((staged.parent / "Raphaeli.kext.raphaeli-remove").exists())
 
     def test_duplicate_entries_keep_first_and_remove_only_raphaeli(self):
         config = self.efi / "EFI" / "OC" / "config.plist"

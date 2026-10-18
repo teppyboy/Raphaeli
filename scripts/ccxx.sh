@@ -8,7 +8,9 @@ mkdir -p $X/xnuobj
 cp -p $X/Raphaeli/Compat/include/nmx_port.h $X/Raphaeli/Compat/include/nmx_xnu.h $X/Raphaeli/Compat/include/nmxxnu/
 target_flags=""
 case "${NMX_TARGET:-sequoia}:$(basename "$1")" in
-  tahoe:nmx_accel*) target_flags="-DNM_TAHOE -I$X/research/tahoe-forwarding" ;;
+  tahoe:nmx_accel*)
+    [ -n "${NMX_ACCEL_HEADERS:-}" ] || { echo "ccxx.sh: Tahoe accelerator headers not prepared" >&2; exit 1; }
+    target_flags="-DNM_TAHOE -I$NMX_ACCEL_HEADERS" ;;
 esac
 exec xcrun clang++ -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}=/src -mkernel -fapple-kext -nostdinc $KERNEL_SDK_INCLUDE \
   -I$X/Raphaeli/Compat/include/nmxxnu -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT \

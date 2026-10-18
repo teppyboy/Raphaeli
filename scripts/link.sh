@@ -3,7 +3,6 @@
 # srcobj/ (FreeBSD-on-xnu layer) and xnuobj/ (IOKit glue). Run build.sh + rt.sh first.
 set -euo pipefail
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
-. "$(cd "$(dirname "$0")" && pwd)/kernel-sdk.sh"
 TARGET_SELECTOR=sequoia
 TARGET_OPTION_SEEN=0
 OUT_ARG=""
@@ -26,12 +25,12 @@ while [ "$#" -gt 0 ]; do
 done
 case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "link.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
 if [ "$TARGET_SELECTOR" = tahoe ] || [ "$TARGET_SELECTOR" = all ]; then
-    TAHOE_ABI_HEADER="$X/research/tahoe-forwarding/nmx_accel_tahoe_forwarding.h"
-    [ -f "$TAHOE_ABI_HEADER" ] || {
-        echo "link.sh: refusing $TARGET_SELECTOR before linking; missing matching Tahoe ABI header $TAHOE_ABI_HEADER" >&2
+    python3 "$X/scripts/prepare-accel-sources.py" --target tahoe --check-only 2>&1 || {
+        echo "link.sh: refusing $TARGET_SELECTOR before linking; missing matching Tahoe ABI header (exact Tahoe ABI audit required)" >&2
         exit 1
     }
 fi
+. "$(cd "$(dirname "$0")" && pwd)/kernel-sdk.sh"
 # Preserve the pre-target interface: link.sh out-disp writes out-disp/Raphaeli.kext.
 # Explicit target selection uses the isolated target layout under out/target/<Target>.
 if [ "$TARGET_OPTION_SEEN" -eq 1 ]; then OUT=${OUT_ARG:-$X/out}; else OUT=${OUT_ARG:-$X/out-disp}; fi
@@ -101,9 +100,9 @@ done
     echo '}'
 } > "$FWGEN/nmx_firmware_table.cpp"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -c "$FWGEN/nmx_firmware_blobs.S" -o "$FWGEN/nmx_firmware_blobs.o"
-NMX_OBJ="$X/$FWGEN/nmx_firmware_table.o" NMX_TARGET="$target" "$X/scripts/ccxx.sh" "$X/$FWGEN/nmx_firmware_table.cpp" > "$LOG_DIR/firmware_table.log" 2>&1 || {
+NMX_OBJ="$FWGEN/nmx_firmware_table.o" NMX_TARGET="$target" "$X/scripts/ccxx.sh" "$FWGEN/nmx_firmware_table.cpp" > "$LOG_DIR/firmware_table.log" 2>&1 || {
     grep -A3 error: "$LOG_DIR/firmware_table.log" | head; exit 1; }
-FWOBJ="$X/$FWGEN/nmx_firmware_blobs.o $X/$FWGEN/nmx_firmware_table.o"
+FWOBJ="$FWGEN/nmx_firmware_blobs.o $FWGEN/nmx_firmware_table.o"
 FW_N=$(printf '%s\n' $FW_BINS | grep -c . || true)
 FW_BYTES=0
 [ -n "$FW_BINS" ] && FW_BYTES=$(cat $FW_BINS 2>/dev/null | wc -c | tr -d ' ') || true
