@@ -132,6 +132,12 @@ KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
 run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
 t "Tahoe override remains fail-closed" 1 run_override "$V1" --target tahoe --dry-run
 assert_out "override validation gate reported" "tahoe_target_validated=no"
+# An override changes only the bundle source; target preflight still runs.
+cp "$DIST/tools/SOURCE.lock" "$WORK/SOURCE.lock.valid"
+sed -i '' 's/^commit=.*/commit=invalid/' "$DIST/tools/SOURCE.lock"
+t "Sequoia override still runs target preflight" 1 run_override "$V1" --target sequoia --dry-run
+assert_out "Sequoia override preflight reported" "commit is not approved"
+mv "$WORK/SOURCE.lock.valid" "$DIST/tools/SOURCE.lock"
 
 # Target selection must install the matching executable, not merely print its path.
 V_TARGET_SEQUOIA=$(newvol "Sequoia target HD")
@@ -210,6 +216,46 @@ fi
 # idempotent apply
 t "apply is idempotent"               0 run_inst "$V1" --apply
 assert_out "already contains"         "boot-args already contain raphaeli-amd=1"
+
+# ---- transaction rollback -----------------------------------------------------
+
+# A failure after userspace and ICD publication must restore every original
+# destination, including the partially written firmware staging tree.
+V_FAIL=$(newvol "Failure HD")
+mkdir -p "$V_FAIL/Library/Raphaeli/usr/lib" "$V_FAIL/Library/Raphaeli/firmware/amdgpu" \
+  "$V_FAIL/usr/local/share/vulkan/icd.d" "$V_FAIL/Library/Extensions/Raphaeli.kext/Contents/MacOS"
+printf 'original drm\n' > "$V_FAIL/Library/Raphaeli/usr/lib/libdrm.2.dylib"
+printf 'original icd\n' > "$V_FAIL/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"
+printf 'original firmware\n' > "$V_FAIL/Library/Raphaeli/firmware/amdgpu/psp_13_0_11_toc.bin"
+printf 'original kext\n' > "$V_FAIL/Library/Extensions/Raphaeli.kext/Contents/MacOS/raphaeli"
+cp "$DIST/tools/fw/stage.sh" "$WORK/stage.sh.valid"
+cat > "$DIST/tools/fw/stage.sh" <<'EOF'
+#!/bin/sh
+mkdir -p "$2/amdgpu" || exit 1
+printf 'partial firmware\n' > "$2/amdgpu/partial.bin" || exit 1
+exit 42
+EOF
+chmod +x "$DIST/tools/fw/stage.sh"
+t "failed apply rolls back all filesystem writes" 1 run_inst "$V_FAIL" --target sequoia --apply
+[[ $(cat "$V_FAIL/Library/Raphaeli/usr/lib/libdrm.2.dylib") == 'original drm' ]] && \
+  { echo "ok    rollback preserves userspace"; pass=$((pass + 1)); } || \
+  { echo "FAIL  rollback preserves userspace"; fail=$((fail + 1)); }
+[[ $(cat "$V_FAIL/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json") == 'original icd' ]] && \
+  { echo "ok    rollback preserves ICD"; pass=$((pass + 1)); } || \
+  { echo "FAIL  rollback preserves ICD"; fail=$((fail + 1)); }
+[[ $(cat "$V_FAIL/Library/Raphaeli/firmware/amdgpu/psp_13_0_11_toc.bin") == 'original firmware' && \
+   ! -e "$V_FAIL/Library/Raphaeli/firmware/amdgpu/partial.bin" ]] && \
+  { echo "ok    rollback preserves firmware"; pass=$((pass + 1)); } || \
+  { echo "FAIL  rollback preserves firmware"; fail=$((fail + 1)); }
+[[ $(cat "$V_FAIL/Library/Extensions/Raphaeli.kext/Contents/MacOS/raphaeli") == 'original kext' ]] && \
+  { echo "ok    rollback preserves kext"; pass=$((pass + 1)); } || \
+  { echo "FAIL  rollback preserves kext"; fail=$((fail + 1)); }
+if find "$V_FAIL" -name '*.raphaeli-*' -print | grep -q .; then
+  echo "FAIL  rollback leaves transaction artifacts"; fail=$((fail + 1))
+else
+  echo "ok    rollback removes transaction artifacts"; pass=$((pass + 1))
+fi
+mv "$WORK/stage.sh.valid" "$DIST/tools/fw/stage.sh"
 
 # ---- OC-detect: skip kext copy + auxKC ----------------------------------------
 

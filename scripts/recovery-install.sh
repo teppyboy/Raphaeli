@@ -80,6 +80,135 @@ run() {
   fi
 }
 
+# Apply filesystem changes as one transaction. Every destination is staged in a
+# sibling path, then the live path is moved aside before the staged path is
+# published. The event log lets EXIT rollback restore every earlier move.
+TX_ACTIVE=0
+TX_ROOT=""
+TX_EVENTS=""
+TX_PATHS=""
+TX_DIRS=""
+
+transaction_rollback() {
+  local line action first second
+  [[ $TX_ACTIVE == 1 ]] || return 0
+  set +e
+  if [[ -f $TX_EVENTS ]]; then
+    while IFS= read -r line; do
+      action=${line%%$'\t'*}
+      first=${line#*$'\t'}
+      second=${first#*$'\t'}
+      first=${first%%$'\t'*}
+      case "$action" in
+        install) rm -rf "$first" ;;
+        backup) [[ -e $second || -L $second ]] && mv "$second" "$first" ;;
+      esac
+    done <<EOF
+$(awk '{ lines[NR]=$0 } END { for (i=NR; i>0; i--) print lines[i] }' "$TX_EVENTS" 2>/dev/null)
+EOF
+  fi
+  if [[ -f $TX_PATHS ]]; then
+    while IFS=$'\t' read -r first second; do
+      rm -rf "$first" "$second"
+    done < "$TX_PATHS"
+  fi
+  if [[ -f $TX_DIRS ]]; then
+    while IFS= read -r first; do
+      rmdir "$first" 2>/dev/null || true
+    done <<EOF
+$(awk '{ lines[NR]=$0 } END { for (i=NR; i>0; i--) print lines[i] }' "$TX_DIRS" 2>/dev/null)
+EOF
+  fi
+  [[ -n $TX_ROOT ]] && rm -rf "$TX_ROOT"
+  TX_ACTIVE=0
+}
+
+transaction_finish() {
+  [[ $TX_ACTIVE == 1 ]] || return 0
+  set +e
+  if [[ -f $TX_PATHS ]]; then
+    while IFS=$'\t' read -r first second; do
+      rm -rf "$first" "$second"
+    done < "$TX_PATHS"
+  fi
+  rm -rf "$TX_ROOT"
+  TX_ACTIVE=0
+}
+
+trap transaction_rollback EXIT
+
+transaction_begin() {
+  TX_ROOT=$VOL/.raphaeli-transaction.$$
+  mkdir "$TX_ROOT"
+  TX_EVENTS=$TX_ROOT/events
+  TX_PATHS=$TX_ROOT/paths
+  TX_DIRS=$TX_ROOT/dirs
+  : > "$TX_EVENTS"
+  : > "$TX_PATHS"
+  : > "$TX_DIRS"
+  TX_ACTIVE=1
+}
+
+transaction_prepare_dir() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+  mkdir "$stage"
+}
+
+transaction_prepare_file() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+  : > "$stage"
+}
+
+transaction_prepare_output() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+}
+
+transaction_ensure_parent() {
+  local dest=$1 parent=$1 missing="" first rest
+  parent=$(dirname "$dest")
+  while [[ ! -d $parent ]]; do
+    missing="$parent
+$missing"
+    parent=$(dirname "$parent")
+  done
+  while [[ -n $missing ]]; do
+    first=${missing%%$'\n'*}
+    if [[ $missing == *$'\n'* ]]; then
+      rest=${missing#*$'\n'}
+    else
+      rest=""
+    fi
+    mkdir "$first"
+    printf '%s\n' "$first" >> "$TX_DIRS"
+    missing=$rest
+  done
+}
+
+transaction_commit() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$ moved_old=0
+  transaction_ensure_parent "$dest"
+  if [[ -e $dest || -L $dest ]]; then
+    mv "$dest" "$backup" || return 1
+    moved_old=1
+    printf 'backup\t%s\t%s\n' "$dest" "$backup" >> "$TX_EVENTS"
+  fi
+  if mv "$stage" "$dest"; then
+    printf 'install\t%s\t%s\n' "$dest" "$stage" >> "$TX_EVENTS"
+  else
+    [[ $moved_old == 1 ]] && mv "$backup" "$dest"
+    return 1
+  fi
+}
+
 # ---- argument parsing -------------------------------------------------------
 
 while (($#)); do
@@ -116,14 +245,14 @@ while (($#)); do
 done
 
 # Resolve the selected bundle after parsing so --target may appear anywhere.
-# RAPHAELI_KEXT is an explicit override and always takes precedence.
-if [[ $TARGET_SELECTOR == tahoe ]]; then
+# RAPHAELI_KEXT changes only the source; target validation still always runs.
+if [[ -n $TARGET_SELECTOR ]]; then
   PREFLIGHT=$SRC_ROOT/tools/target-preflight.sh
   [[ -x $PREFLIGHT ]] || PREFLIGHT=$SRC_ROOT/scripts/target-preflight.sh
   LOCK=$SRC_ROOT/tools/SOURCE.lock
   [[ -f $LOCK ]] || LOCK=$SRC_ROOT/Raphaeli/Kernel/Accel/upstream/SOURCE.lock
   [[ -x $PREFLIGHT ]] || die "target preflight helper not found"
-  "$PREFLIGHT" tahoe "$LOCK" || die "Tahoe target is not validated"
+  "$PREFLIGHT" "$TARGET_SELECTOR" "$LOCK" || die "$TARGET_SELECTOR target is not validated"
 fi
 if [[ -z $KEXT_SRC ]]; then
   if [[ -n $TARGET_SELECTOR ]]; then
@@ -234,6 +363,7 @@ fi
 
 if (( ! DRY_RUN )); then
   mount -uw "$VOL" 2>/dev/null || true   # ignored if already rw (or read-only snapshot)
+  transaction_begin
 else
   echo "DRY-RUN: mount -uw $VOL"
 fi
@@ -242,8 +372,14 @@ fi
 
 LIB_DEST=$VOL/Library/Raphaeli/usr/lib
 log "installing dylibs -> $LIB_DEST"
-run mkdir -p "$LIB_DEST"
-run cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST"/
+if (( DRY_RUN )); then
+  run mkdir -p "$LIB_DEST"
+  run cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST"/
+else
+  transaction_prepare_dir "$LIB_DEST"
+  cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST.raphaeli-staging.$$"/
+  transaction_commit "$LIB_DEST"
+fi
 
 # Vulkan ICD json: absolute library_path, loader default-scans
 # /usr/local/share/vulkan/icd.d (on the Data volume, writable).
@@ -254,7 +390,9 @@ icd_body=$'{\n  "file_format_version": "1.0.0",\n  "ICD": {\n    "library_path":
 if (( DRY_RUN )); then
   echo "DRY-RUN: write $ICD_DEST (library_path=$ICD_LIBRARY_PATH)"
 else
-  printf '%s' "$icd_body" > "$ICD_DEST"
+  transaction_prepare_file "$ICD_DEST"
+  printf '%s' "$icd_body" > "$ICD_DEST.raphaeli-staging.$$"
+  transaction_commit "$ICD_DEST"
 fi
 
 # ---- firmware ----------------------------------------------------------------
@@ -262,7 +400,13 @@ fi
 FW_DEST=$VOL/Library/Raphaeli/firmware
 log "staging firmware -> $FW_DEST (stage.sh)"
 [[ -f $FW_STAGE_SH ]] || die "stage.sh not found at $FW_STAGE_SH"
-run sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST"
+if (( DRY_RUN )); then
+  run sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST"
+else
+  transaction_prepare_dir "$FW_DEST"
+  sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST.raphaeli-staging.$$" || die "firmware staging failed"
+  transaction_commit "$FW_DEST"
+fi
 
 # ---- kext: OC-detect or direct copy + auxKC ----------------------------------
 
@@ -275,10 +419,18 @@ if [[ -f $VOL/EFI/OC/config.plist ]]; then
 else
   KEXT_DEST=$VOL/Library/Extensions/Raphaeli.kext
   log "installing kext -> $KEXT_DEST (root:wheel, 755)"
-  run rm -rf "$KEXT_DEST"
-  run ditto "$KEXT_SRC" "$KEXT_DEST"
-  run chown -R root:wheel "$KEXT_DEST" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
-  run chmod -R 755 "$KEXT_DEST"
+  if (( DRY_RUN )); then
+    run rm -rf "$KEXT_DEST"
+    run ditto "$KEXT_SRC" "$KEXT_DEST"
+    run chown -R root:wheel "$KEXT_DEST" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
+    run chmod -R 755 "$KEXT_DEST"
+  else
+    transaction_prepare_dir "$KEXT_DEST"
+    ditto "$KEXT_SRC" "$KEXT_DEST.raphaeli-staging.$$"
+    chown -R root:wheel "$KEXT_DEST.raphaeli-staging.$$" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
+    chmod -R 755 "$KEXT_DEST.raphaeli-staging.$$"
+    transaction_commit "$KEXT_DEST"
+  fi
 
   # auxKC: best effort. kmutil exists in recent RecoveryOS; needs a matching KDK
   # and the target volume's kernel collections.
@@ -292,15 +444,28 @@ else
     done
     if [[ -n $kdk ]]; then
       log "building aux KC (kmutil, KDK: $(basename "$kdk"))"
-      run mkdir -p "$VOL/Library/KernelCollections"
-      run kmutil create \
-        -a x86_64 -n aux -x \
-        -p "$KEXT_DEST" \
-        --no-authentication \
-        -A "$VOL/Library/KernelCollections/Raphaeli.auxkc" \
-        -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
-        -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
-        --kdk "$kdk" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      AUXKC_DEST=$VOL/Library/KernelCollections/Raphaeli.auxkc
+      if (( DRY_RUN )); then
+        run mkdir -p "$VOL/Library/KernelCollections"
+        run kmutil create \
+          -a x86_64 -n aux -x \
+          -p "$KEXT_DEST" \
+          --no-authentication \
+          -A "$AUXKC_DEST" \
+          -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
+          -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
+          --kdk "$kdk" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      else
+        transaction_prepare_output "$AUXKC_DEST"
+        kmutil create \
+          -a x86_64 -n aux -x \
+          -p "$KEXT_DEST" \
+          --no-authentication \
+          -A "$AUXKC_DEST.raphaeli-staging.$$" \
+          -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
+          -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
+          --kdk "$kdk" && transaction_commit "$AUXKC_DEST" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      fi
     else
       log "no matching KDK under $VOL/Library/Developer/KDKs (target build ${tgt_build:-?}); skipping auxKC"
     fi
@@ -328,6 +493,12 @@ if (( APPLY )); then
   echo "  nvram -d boot-args         # full reset (only if no other boot-args were set)"
 else
   log "not applying boot-args (pass --apply to add $BOOT_ARG)"
+fi
+
+# Publish staged filesystem changes only after every install step succeeds,
+# including the optional boot-arg write.
+if (( ! DRY_RUN )); then
+  transaction_finish
 fi
 
 # ---- next steps ----------------------------------------------------------------
