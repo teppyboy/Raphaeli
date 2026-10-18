@@ -19,6 +19,35 @@ assert_grep 'obj/target|OBJ_ROOT' "$ROOT/scripts/build.sh" "build isolates targe
 assert_grep 'obj/target|OBJ_ROOT' "$ROOT/scripts/rt.sh" "rt isolates target objects"
 assert_grep 'out/target|OUT.*target' "$ROOT/scripts/link.sh" "link isolates target bundles"
 assert_grep 'NM_TAHOE' "$ROOT/scripts/ccxx.sh" "Tahoe compiler define exists"
+assert_grep 'OUT=.*out-disp' "$ROOT/scripts/link.sh" "legacy link output remains out-disp"
+assert_grep 'OUT_TARGET=.*OUT' "$ROOT/scripts/link.sh" "legacy bundle stays at requested output root"
+assert_grep 'OUT_TARGET="\$OUT/target/\$name"' "$ROOT/scripts/link.sh" "target bundle uses isolated output path"
+assert_grep 'OUT_TARGET="\$OUT"' "$ROOT/scripts/link.sh" "legacy bundle uses output root"
+assert_grep 'LOG_DIR=.*OUT_TARGET' "$ROOT/scripts/link.sh" "link logs live under target output"
+assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/build.sh" "build rejects Tahoe before compilation"
+assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/rt.sh" "rt rejects Tahoe before compilation"
+assert_grep 'missing matching Tahoe ABI header' "$ROOT/scripts/link.sh" "link rejects Tahoe before linking"
+
+# Duplicate selectors reject before any build or link work.
+for script in build.sh rt.sh link.sh; do
+  if "$ROOT/scripts/$script" --target sequoia --target tahoe >"$TMP/$script.duplicate.log" 2>&1; then
+    bad "$script rejects duplicate --target"
+  else
+    grep -Fq -- '--target specified more than once' "$TMP/$script.duplicate.log" && ok "$script rejects duplicate --target" || bad "$script rejects duplicate --target"
+  fi
+done
+
+# --target all preflights Tahoe before Sequoia work, so a missing ABI cannot leave partial output.
+for script in build.sh rt.sh link.sh; do
+  rm -rf "$TMP/$script.all-output"
+  mkdir -p "$TMP/$script.all-output"
+  if GPU_SRC_ROOT="$TMP/$script.all-output" "$ROOT/scripts/$script" --target all >"$TMP/$script.all.log" 2>&1; then
+    bad "$script rejects incomplete all"
+  else
+    grep -Fq -- 'missing matching Tahoe ABI header' "$TMP/$script.all.log" && ok "$script rejects incomplete all" || bad "$script rejects incomplete all"
+    [ ! -e "$TMP/$script.all-output/obj" ] && [ ! -e "$TMP/$script.all-output/out" ] && ok "$script all leaves no partial artifacts" || bad "$script all leaves no partial artifacts"
+  fi
+done
 
 # Fake xcrun captures the final compiler command without requiring a KDK.
 mkdir -p "$TMP/bin" "$TMP/obj"

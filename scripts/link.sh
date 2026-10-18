@@ -4,11 +4,19 @@
 set -euo pipefail
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 TARGET_SELECTOR=sequoia
+TARGET_OPTION_SEEN=0
 OUT_ARG=""
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --target) shift; [ "$#" -gt 0 ] || { echo "link.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }; TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
-        --target=*) TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
+        --target)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "link.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
+            shift; [ "$#" -gt 0 ] || { echo "link.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }
+            TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
+        --target=*)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "link.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
+            TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
         --help|-h) echo "usage: scripts/link.sh [out-dir] [--target sequoia|tahoe|all]"; exit 0 ;;
         --*) echo "link.sh: unknown option $1" >&2; exit 1 ;;
         *) [ -z "$OUT_ARG" ] || { echo "link.sh: output specified more than once" >&2; exit 1; }; OUT_ARG=$1 ;;
@@ -16,7 +24,16 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "link.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
-OUT=${OUT_ARG:-$X/out}
+if [ "$TARGET_SELECTOR" = tahoe ] || [ "$TARGET_SELECTOR" = all ]; then
+    TAHOE_ABI_HEADER="$X/research/tahoe-forwarding/nmx_accel_tahoe_forwarding.h"
+    [ -f "$TAHOE_ABI_HEADER" ] || {
+        echo "link.sh: refusing $TARGET_SELECTOR before linking; missing matching Tahoe ABI header $TAHOE_ABI_HEADER" >&2
+        exit 1
+    }
+fi
+# Preserve the pre-target interface: link.sh out-disp writes out-disp/Raphaeli.kext.
+# Explicit target selection uses the isolated target layout under out/target/<Target>.
+if [ "$TARGET_OPTION_SEEN" -eq 1 ]; then OUT=${OUT_ARG:-$X/out}; else OUT=${OUT_ARG:-$X/out-disp}; fi
 cd "$X"
 
 link_target() {
@@ -24,9 +41,10 @@ link_target() {
     case "$target" in sequoia) name=Sequoia ;; tahoe) name=Tahoe ;; esac
     OBJROOT="$X/obj/target/$name"
     LKOBJ="$OBJROOT/lkobj"; SRCOBJ="$OBJROOT/srcobj"; XNUOBJ="$OBJROOT/xnuobj"
-    OUT_TARGET="$OUT/target/$name"
+    if [ "$TARGET_OPTION_SEEN" -eq 1 ]; then OUT_TARGET="$OUT/target/$name"; else OUT_TARGET="$OUT"; fi
+    LOG_DIR="$OUT_TARGET/log"
     export NMX_TARGET="$target" NMX_OBJ_ROOT="$XNUOBJ"
-    mkdir -p "$OUT_TARGET"
+    mkdir -p "$OUT_TARGET" "$LOG_DIR"
     for f in "$OBJROOT"/*.o "$LKOBJ"/*.o "$SRCOBJ"/*.o "$XNUOBJ"/*.o; do
         [ -e "$f" ] || continue
         file -b "$f" | grep -q Mach-O || { echo "stale object: $f"; rm "$f"; }
@@ -82,8 +100,8 @@ done
     echo '}'
 } > "$FWGEN/nmx_firmware_table.cpp"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -c "$FWGEN/nmx_firmware_blobs.S" -o "$FWGEN/nmx_firmware_blobs.o"
-NMX_OBJ="$X/$FWGEN/nmx_firmware_table.o" NMX_TARGET="$target" "$X/scripts/ccxx.sh" "$X/$FWGEN/nmx_firmware_table.cpp" > xlog_nmx_firmware_table.txt 2>&1 || {
-    grep -A3 error: xlog_nmx_firmware_table.txt | head; exit 1; }
+NMX_OBJ="$X/$FWGEN/nmx_firmware_table.o" NMX_TARGET="$target" "$X/scripts/ccxx.sh" "$X/$FWGEN/nmx_firmware_table.cpp" > "$LOG_DIR/firmware_table.log" 2>&1 || {
+    grep -A3 error: "$LOG_DIR/firmware_table.log" | head; exit 1; }
 FWOBJ="$X/$FWGEN/nmx_firmware_blobs.o $X/$FWGEN/nmx_firmware_table.o"
 FW_N=$(printf '%s\n' $FW_BINS | grep -c . || true)
 FW_BYTES=0
@@ -96,8 +114,8 @@ xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlink
   "$OBJROOT"/*.o "$LKOBJ"/*.o "$SRCOBJ"/*.o "$XNUOBJ"/nmx_kext.o "$XNUOBJ"/nmx_devfs.o "$XNUOBJ"/nmx_dma.o \
   "$XNUOBJ"/nmx_fb.o "$XNUOBJ"/nmx_accel.o "$XNUOBJ"/nmx_accel_uc.o "$XNUOBJ"/nmx_mm.o "$XNUOBJ"/nmx_pci.o "$XNUOBJ"/nmx_platform.o "$XNUOBJ"/nmx_vm.o \
   $FWOBJ \
-  -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
-    grep -E "error|Undefined|duplicate" link.log | head -40; exit 1; }
+  -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> "$LOG_DIR/link.log" || {
+    grep -E "error|Undefined|duplicate" "$LOG_DIR/link.log" | head -40; exit 1; }
 cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 mkdir -p "$K/Resources/firmware/amdgpu"
 [ -n "$FW_BINS" ] && cp "$FWDIR"/*.bin "$K/Resources/firmware/amdgpu/"

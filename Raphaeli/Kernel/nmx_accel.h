@@ -28,24 +28,22 @@
 # else
 #  error "NM_TAHOE requires generated Tahoe accelerator forwarding headers"
 # endif
+#else
+/* The Sequoia-only reconstructed private ABI must never enter a Tahoe translation unit. */
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/re/IOGraphicsAccelerator2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelEventMachineFast2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacyDisplayMachine.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelTask.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelMemoryMap.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelResource2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelSysMemory.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVidMemory.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacySurface.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelGLContext2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccel2DContext2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelCLContext2.h"
+# include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVideoContext2.h"
 #endif
-
-#define ACCELLOG(fmt, ...) IOLog("Raphaeli accel: " fmt "\n", ##__VA_ARGS__)
-
-/* the family, reconstructed (vtable order + sizes verified against the shipped binary by the reference driver) */
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/re/IOGraphicsAccelerator2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelEventMachineFast2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacyDisplayMachine.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelTask.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelMemoryMap.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelResource2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelSysMemory.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVidMemory.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacySurface.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelGLContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccel2DContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelCLContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVideoContext2.h"
 
 /*
  * The accel submit hooks of the lane contract (v1): the family-side surface every accel-side submit goes

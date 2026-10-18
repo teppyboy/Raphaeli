@@ -19,4 +19,13 @@ The static/mock test verifies selector support, isolated roots, Tahoe `-DNM_TAHO
 
 A real Tahoe accelerator build intentionally fails until matching private Tahoe forwarding headers are generated from the target SDK/KC. This prevents silently linking Sequoia private ABI against Tahoe. Hardware and full native builds were not run on this host.
 
+## Fix round 1
+
+- `--target all` now preflights the required Tahoe forwarding header in `build.sh`, `rt.sh`, and `link.sh`; missing ABI rejects before any target work, preventing partial artifacts. Duplicate `--target` options reject before work.
+- Tahoe forwarding declarations are the only accelerator-header path under `NM_TAHOE`; the reconstructed Sequoia private headers are inside the non-Tahoe guard. Tahoe remains clearly rejected until matching generated declarations exist.
+- Legacy `link.sh out-disp` retains `out-disp/Raphaeli.kext`. Explicit target mode writes `out/target/Sequoia` or `out/target/Tahoe`; link logs now live under each output's `log/` directory.
+- Expanded `scripts/tests/target_build_args_test.sh` for duplicate selectors, all preflight/no-partial-artifact behavior, legacy/target output paths, logs, and Tahoe rejection.
+
+Validation: target argument test passed; Bash syntax checks and `git diff --check` passed.
+
 Existing unrelated worktree changes were not touched.

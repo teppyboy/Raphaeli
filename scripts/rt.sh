@@ -7,16 +7,32 @@ X=$R
 L=$R/kpi/freebsd-src/sys/compat/linuxkpi/common/src
 cd "$X" || exit 1
 TARGET_SELECTOR=sequoia
+TARGET_OPTION_SEEN=0
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --target) shift; [ "$#" -gt 0 ] || { echo "rt.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }; TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
-        --target=*) TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
+        --target)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "rt.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
+            shift; [ "$#" -gt 0 ] || { echo "rt.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }; TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
+        --target=*)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "rt.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
+            TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
         --help|-h) echo "usage: scripts/rt.sh --target sequoia|tahoe|all"; exit 0 ;;
         *) echo "rt.sh: unknown option $1" >&2; exit 1 ;;
     esac
     shift
 done
 case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "rt.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
+# Tahoe accelerator objects require private ABI declarations generated from the matching Tahoe SDK/KC.
+# Reject before any target (including Sequoia in --target all) starts, preventing partial artifacts.
+if [ "$TARGET_SELECTOR" = tahoe ] || [ "$TARGET_SELECTOR" = all ]; then
+    TAHOE_ABI_HEADER="$X/research/tahoe-forwarding/nmx_accel_tahoe_forwarding.h"
+    [ -f "$TAHOE_ABI_HEADER" ] || {
+        echo "rt.sh: refusing $TARGET_SELECTOR before compiling; missing matching Tahoe ABI header $TAHOE_ABI_HEADER" >&2
+        exit 1
+    }
+fi
 # networking, USB and wireless are not part of the GPU driver; i2c/i2cbb are replaced by nmx_linux_i2c.c;
 # cmdline and eventfd are unused (drm-kmod's own headers answer them)
 SKIP=" linux_80211 linux_80211_macops linuxkpi_80211_pm linux_netdev linux_usb linux_i2c linux_i2cbb linux_cmdline linux_eventfd "

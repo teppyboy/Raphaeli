@@ -7,13 +7,19 @@ K=$GPU_SRC_ROOT/kpi
 cd "$X" || exit 1
 
 TARGET_SELECTOR=sequoia
+TARGET_OPTION_SEEN=0
 RANK=40
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --target)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "build.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
             shift; [ "$#" -gt 0 ] || { echo "build.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }
             TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
-        --target=*) TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
+        --target=*)
+            [ "$TARGET_OPTION_SEEN" -eq 0 ] || { echo "build.sh: --target specified more than once" >&2; exit 1; }
+            TARGET_OPTION_SEEN=1
+            TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
         --help|-h) echo "usage: scripts/build.sh [--target sequoia|tahoe|all] [N]"; exit 0 ;;
         --*) echo "build.sh: unknown option $1" >&2; exit 1 ;;
         *) RANK=$1 ;;
@@ -21,6 +27,15 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "build.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
+# Tahoe accelerator objects require private ABI declarations generated from the matching Tahoe SDK/KC.
+# Reject before any target (including Sequoia in --target all) starts, preventing partial artifacts.
+if [ "$TARGET_SELECTOR" = tahoe ] || [ "$TARGET_SELECTOR" = all ]; then
+    TAHOE_ABI_HEADER="$X/research/tahoe-forwarding/nmx_accel_tahoe_forwarding.h"
+    [ -f "$TAHOE_ABI_HEADER" ] || {
+        echo "build.sh: refusing $TARGET_SELECTOR before compiling; missing matching Tahoe ABI header $TAHOE_ABI_HEADER" >&2
+        exit 1
+    }
+fi
 bash "$X/scripts/kpi-init.sh" || exit 1
 
 EXCLUDE="amdgpu_dm_crc.c drm_gem_ttm_helper.c drm_writeback.c drm_hdcp_helper.c sync_file.c dma-fence-unwrap.c dma-buf.c dma-buf-kmod.c linux_fb.c vt_drmfb.c drm_os_freebsd.c"
