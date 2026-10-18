@@ -253,14 +253,17 @@ def validate_config() -> None:
         die(f"config.plist invalid after edit ({e}); restore from backup")
 
 
-def find_entry_index(cfg: "dict") -> "int | None":
+def find_entry_indices(cfg: "dict") -> "list[int]":
     add = cfg.get("Kernel", {}).get("Add", [])
     if not isinstance(add, list):
-        return None
-    for i, e in enumerate(add):
-        if isinstance(e, dict) and e.get("BundlePath") == KEXT_NAME:
-            return i
-    return None
+        return []
+    return [i for i, e in enumerate(add)
+            if isinstance(e, dict) and e.get("BundlePath") == KEXT_NAME]
+
+
+def find_entry_index(cfg: "dict") -> "int | None":
+    indices = find_entry_indices(cfg)
+    return indices[0] if indices else None
 
 
 def read_bootargs(cfg: "dict") -> str:
@@ -387,6 +390,36 @@ def copy_kext(src: str, dst: str) -> None:
     shutil.copytree(src, dst, symlinks=True)
 
 
+def stamp_target_metadata(bundle: str, target: TargetInfo) -> None:
+    """Stamp selected target on the staged bundle, preserving bundle identity."""
+    if not target.name:
+        return
+    info_path = os.path.join(bundle, "Contents", "Info.plist")
+    try:
+        with open(info_path, "rb") as stream:
+            info = plistlib.load(stream)
+    except (OSError, plistlib.InvalidFileException, ValueError) as e:
+        die(f"cannot read staged kext metadata {info_path}: {e}")
+    if not isinstance(info, dict):
+        die(f"staged kext metadata is not a dictionary: {info_path}")
+    info["SelectedTarget"] = target.name
+    if info.get("CFBundleName") not in (None, "Raphaeli"):
+        die(f"staged kext has unexpected CFBundleName: {info.get('CFBundleName')!r}")
+    if "CFBundleName" not in info:
+        info["CFBundleName"] = "Raphaeli"
+    tmp = info_path + ".raphaeli-tmp"
+    try:
+        with open(tmp, "wb") as stream:
+            plistlib.dump(info, stream, fmt=plistlib.FMT_XML)
+        os.replace(tmp, info_path)
+    except OSError as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        die(f"cannot stamp staged kext metadata {info_path}: {e}")
+
+
 def action_add() -> None:
     package_root = os.path.dirname(SCRIPT_DIR)
     if KEXT_SRC_EXPLICIT and not TARGET_SELECTOR and not SYSTEM_ROOT_SET:
@@ -399,10 +432,14 @@ def action_add() -> None:
     if not os.path.isfile(os.path.join(source, "Contents", "Info.plist")):
         die(f"kext bundle missing Contents/Info.plist: {source}")
     cfg = load_config()
-    idx = find_entry_index(cfg)
+    indices = find_entry_indices(cfg)
+    idx = indices[0] if indices else None
     if idx is not None:
         log(f"config entry already present at Kernel>Add:{idx}")
         entry = cfg["Kernel"]["Add"][idx]
+        enabled = entry.get("Enabled")
+        if enabled is not True:
+            die(f"existing entry has Enabled={enabled}; fix config.plist manually")
         changed = False
         if entry.get("Comment") != KEXT_NAME:
             log(f"refreshing Comment -> {KEXT_NAME!r}")
@@ -412,14 +449,16 @@ def action_add() -> None:
             entry["MinKernel"] = target.min_kernel
             entry["MaxKernel"] = target.max_kernel
             changed = True
+        if len(indices) > 1:
+            log(f"removing {len(indices) - 1} duplicate Kernel>Add entries")
+            for duplicate in reversed(indices[1:]):
+                cfg["Kernel"]["Add"].pop(duplicate)
+            changed = True
         if changed:
             if DRY_RUN:
                 print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
             else:
                 save_config(cfg)
-        enabled = entry.get("Enabled")
-        if enabled is not True:
-            die(f"existing entry has Enabled={enabled}; fix config.plist manually")
     else:
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
         backup = f"{CONFIG}.raphaeli-backup-{ts}"
@@ -451,7 +490,10 @@ def action_add() -> None:
         else:
             add.append(entry)
             save_config(cfg)
-    copy_kext(source, os.path.join(KEXTS_DIR, KEXT_NAME))
+    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
+    copy_kext(source, staged)
+    if not DRY_RUN:
+        stamp_target_metadata(staged, target)
     stage_firmware()
     if not DRY_RUN:
         validate_config()
@@ -488,13 +530,14 @@ def action_disable() -> None:
 
 def action_remove() -> None:
     cfg = load_config()
-    idx = find_entry_index(cfg)
-    if idx is not None:
-        log(f"deleting Kernel>Add:{idx} ({KEXT_NAME})")
+    indices = find_entry_indices(cfg)
+    if indices:
+        log(f"deleting {len(indices)} Kernel>Add entr{'y' if len(indices) == 1 else 'ies'} ({KEXT_NAME})")
         if DRY_RUN:
-            print(f"DRY-RUN: delete :Kernel:Add:{idx}")
+            print(f"DRY-RUN: delete :Kernel:Add entries {indices}")
         else:
-            cfg["Kernel"]["Add"].pop(idx)
+            for idx in reversed(indices):
+                cfg["Kernel"]["Add"].pop(idx)
             save_config(cfg)
     else:
         log(f"no Kernel>Add entry for {KEXT_NAME} (nothing to delete)")

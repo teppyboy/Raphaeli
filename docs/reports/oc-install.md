@@ -86,3 +86,29 @@ PASSED. `python3 -m py_compile oc-install.py` clean.
 - `xkpi/oc-install.test.sh` (new)
 
 `install.sh` and kext sources untouched.
+
+## Task 2 fix round 1
+
+Reviewer findings addressed:
+
+- `--add` now stamps the selected bundle's staged `Contents/Info.plist` with
+  `SelectedTarget` and supplies `CFBundleName=Raphaeli` when absent. The source
+  bundle remains unchanged; target selection and kernel bounds still come from
+  the production resolver and `Kernel>Add` entry.
+- Duplicate `Kernel>Add` entries for `Raphaeli.kext` are handled deterministically:
+  the first entry is retained and refreshed, later matching entries are removed
+  in reverse index order. Unrelated entries remain in their original order.
+- Target fixtures now start without `SelectedTarget`, proving production
+  staging—not fixture setup—creates the metadata.
+
+Validation:
+
+```sh
+python3 -m unittest scripts/tests/oc_install_target_test.py
+./scripts/oc-install.test.sh
+python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test.py
+git diff --check
+```
+
+Results: 11 target tests passed; OpenCore shell integration passed; compile and
+whitespace checks passed.

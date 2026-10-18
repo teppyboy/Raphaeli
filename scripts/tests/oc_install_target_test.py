@@ -25,8 +25,8 @@ class TargetResolutionTest(unittest.TestCase):
         self.package = self.root / "package"
         self.efi = self.root / "efi"
         self._make_efi()
-        self._make_kext(self.package / "target" / "Sequoia" / "Raphaeli.kext", "Sequoia")
-        self._make_kext(self.package / "target" / "Tahoe" / "Raphaeli.kext", "Tahoe")
+        self._make_kext(self.package / "target" / "Sequoia" / "Raphaeli.kext")
+        self._make_kext(self.package / "target" / "Tahoe" / "Raphaeli.kext")
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -121,7 +121,7 @@ class TargetResolutionTest(unittest.TestCase):
         self.assertEqual(entry["MaxKernel"], "25.99.99")
         self.assertTrue((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").is_file())
 
-    def test_add_target_selects_bundle_without_kext_override(self):
+    def test_add_stamps_selected_target_metadata_in_production(self):
         result = self._run_add_from_package("--target", "tahoe")
         self.assertEqual(result.returncode, 0, result.stderr)
         staged_info = plistlib.loads(
@@ -129,6 +129,10 @@ class TargetResolutionTest(unittest.TestCase):
         )
         self.assertEqual(staged_info["SelectedTarget"], "Tahoe")
         self.assertEqual(staged_info["CFBundleName"], "Raphaeli")
+        source_info = plistlib.loads(
+            (self.package / "target" / "Tahoe" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
+        )
+        self.assertNotIn("SelectedTarget", source_info)
 
     def test_existing_entry_always_refreshes_selected_bounds(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
@@ -145,6 +149,24 @@ class TargetResolutionTest(unittest.TestCase):
         entry = plistlib.loads(config.read_bytes())["Kernel"]["Add"][0]
         self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
         self.assertEqual(entry["CustomField"], "preserve-me")
+
+    def test_duplicate_entries_keep_first_and_remove_only_raphaeli(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [
+            {"BundlePath": "Raphaeli.kext", "Enabled": True, "Marker": "keep",
+             "MinKernel": "23.4.0", "MaxKernel": "23.99.99"},
+            {"BundlePath": "Other.kext", "Enabled": True},
+            {"BundlePath": "Raphaeli.kext", "Enabled": True, "Marker": "drop"},
+        ]}}))
+        result = self._run_add(
+            "--target", "tahoe",
+            "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entries = plistlib.loads(config.read_bytes())["Kernel"]["Add"]
+        self.assertEqual([entry["BundlePath"] for entry in entries], ["Raphaeli.kext", "Other.kext"])
+        self.assertEqual(entries[0]["Marker"], "keep")
+        self.assertEqual((entries[0]["MinKernel"], entries[0]["MaxKernel"]), ("25.0.0", "25.99.99"))
 
     def test_kext_override_requires_known_target_and_uses_override(self):
         override = self.root / "override" / "Raphaeli.kext"
