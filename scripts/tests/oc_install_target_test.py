@@ -29,7 +29,7 @@ class TargetResolutionTest(unittest.TestCase):
         self._make_kext(self.package / "target" / "Sequoia" / "Raphaeli.kext")
         self._make_kext(self.package / "target" / "Tahoe" / "Raphaeli.kext")
         lock = (ROOT / "Raphaeli" / "Kernel" / "Accel" / "upstream" / "SOURCE.lock").read_text()
-        (self.package / "SOURCE.lock").write_text(lock.replace("tahoe_target_validated=no", "tahoe_target_validated=yes"))
+        (self.package / "SOURCE.lock").write_text(lock)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -84,9 +84,7 @@ class TargetResolutionTest(unittest.TestCase):
             text=True,
         )
 
-    def test_unvalidated_tahoe_lock_fails_closed(self):
-        lock = self.package / "SOURCE.lock"
-        lock.write_text(lock.read_text().replace("tahoe_target_validated=yes", "tahoe_target_validated=no"))
+    def test_tahoe_selection_rejected_when_source_lock_unvalidated(self):
         with self.assertRaises(SystemExit):
             oc_install.resolve_target("tahoe", "", str(self.package))
 
@@ -96,20 +94,16 @@ class TargetResolutionTest(unittest.TestCase):
         self.assertEqual(sequoia.source_bundle, str(self.package / "target" / "Sequoia" / "Raphaeli.kext"))
         self.assertEqual((sequoia.min_kernel, sequoia.max_kernel), ("24.0.0", "24.99.99"))
 
-        tahoe = oc_install.resolve_target("tahoe", "", str(self.package))
-        self.assertEqual(tahoe.name, "Tahoe")
-        self.assertEqual(tahoe.source_bundle, str(self.package / "target" / "Tahoe" / "Raphaeli.kext"))
-        self.assertEqual((tahoe.min_kernel, tahoe.max_kernel), ("25.0.0", "25.99.99"))
+        with self.assertRaises(SystemExit):
+            oc_install.resolve_target("tahoe", "", str(self.package))
 
     def test_system_root_product_version_selects_target(self):
         self.assertEqual(
             oc_install.resolve_target("", str(self._system_root("15.7")), str(self.package)).name,
             "Sequoia",
         )
-        self.assertEqual(
-            oc_install.resolve_target("", str(self._system_root("26.6")), str(self.package)).name,
-            "Tahoe",
-        )
+        with self.assertRaises(SystemExit):
+            oc_install.resolve_target("", str(self._system_root("26.6")), str(self.package))
 
     def test_missing_or_unsupported_target_fails_without_mutation(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
@@ -122,24 +116,24 @@ class TargetResolutionTest(unittest.TestCase):
             self.assertFalse((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext").exists())
 
     def test_add_uses_selected_bundle_and_bounds(self):
-        result = self._run_add("--target", "tahoe", "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"))
+        result = self._run_add("--target", "sequoia", "--kext-src", str(self.package / "target" / "Sequoia" / "Raphaeli.kext"))
         self.assertEqual(result.returncode, 0, result.stderr)
         cfg = plistlib.loads((self.efi / "EFI" / "OC" / "config.plist").read_bytes())
         entry = cfg["Kernel"]["Add"][0]
-        self.assertEqual(entry["MinKernel"], "25.0.0")
-        self.assertEqual(entry["MaxKernel"], "25.99.99")
+        self.assertEqual(entry["MinKernel"], "24.0.0")
+        self.assertEqual(entry["MaxKernel"], "24.99.99")
         self.assertTrue((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").is_file())
 
     def test_add_stamps_selected_target_metadata_in_production(self):
-        result = self._run_add_from_package("--target", "tahoe")
+        result = self._run_add_from_package("--target", "sequoia")
         self.assertEqual(result.returncode, 0, result.stderr)
         staged_info = plistlib.loads(
             (self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
         )
-        self.assertEqual(staged_info["SelectedTarget"], "Tahoe")
+        self.assertEqual(staged_info["SelectedTarget"], "Sequoia")
         self.assertEqual(staged_info["CFBundleName"], "Raphaeli")
         source_info = plistlib.loads(
-            (self.package / "target" / "Tahoe" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
+            (self.package / "target" / "Sequoia" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
         )
         self.assertNotIn("SelectedTarget", source_info)
 
@@ -153,10 +147,10 @@ class TargetResolutionTest(unittest.TestCase):
             "MaxKernel": "23.99.99",
             "CustomField": "preserve-me",
         }]}}))
-        result = self._run_add("--target", "tahoe", "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"))
+        result = self._run_add("--target", "sequoia", "--kext-src", str(self.package / "target" / "Sequoia" / "Raphaeli.kext"))
         self.assertEqual(result.returncode, 0, result.stderr)
         entry = plistlib.loads(config.read_bytes())["Kernel"]["Add"][0]
-        self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
+        self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("24.0.0", "24.99.99"))
         self.assertEqual(entry["CustomField"], "preserve-me")
         backups = list(config.parent.glob("config.plist.raphaeli-backup-*"))
         self.assertEqual(len(backups), 1)
@@ -177,9 +171,9 @@ class TargetResolutionTest(unittest.TestCase):
         try:
             oc_install.CONFIG = str(config)
             oc_install.KEXTS_DIR = str(self.efi / "EFI" / "OC" / "Kexts")
-            oc_install.KEXT_SRC = str(self.package / "target" / "Tahoe" / "Raphaeli.kext")
+            oc_install.KEXT_SRC = str(self.package / "target" / "Sequoia" / "Raphaeli.kext")
             oc_install.KEXT_SRC_EXPLICIT = True
-            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.TARGET_SELECTOR = "sequoia"
             oc_install.SYSTEM_ROOT_SET = False
             oc_install.DRY_RUN = False
             def unexpected_firmware_stage():
@@ -214,9 +208,9 @@ class TargetResolutionTest(unittest.TestCase):
         try:
             oc_install.CONFIG = str(config)
             oc_install.KEXTS_DIR = str(staged.parent)
-            oc_install.KEXT_SRC = str(self.package / "target" / "Tahoe" / "Raphaeli.kext")
+            oc_install.KEXT_SRC = str(self.package / "target" / "Sequoia" / "Raphaeli.kext")
             oc_install.KEXT_SRC_EXPLICIT = True
-            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.TARGET_SELECTOR = "sequoia"
             oc_install.SYSTEM_ROOT_SET = False
             oc_install.DRY_RUN = False
             def fail_copy(_source, _destination):
@@ -253,9 +247,9 @@ class TargetResolutionTest(unittest.TestCase):
         try:
             oc_install.CONFIG = str(config)
             oc_install.KEXTS_DIR = str(self.efi / "EFI/OC/Kexts")
-            oc_install.KEXT_SRC = str(self.package / "target/Tahoe/Raphaeli.kext")
+            oc_install.KEXT_SRC = str(self.package / "target/Sequoia/Raphaeli.kext")
             oc_install.KEXT_SRC_EXPLICIT = True
-            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.TARGET_SELECTOR = "sequoia"
             oc_install.SYSTEM_ROOT_SET = False
             oc_install.SYS_ROOT = str(self.root / "system")
             oc_install.FW_SRC = str(source)
@@ -287,9 +281,9 @@ class TargetResolutionTest(unittest.TestCase):
         try:
             oc_install.CONFIG = str(config)
             oc_install.KEXTS_DIR = str(self.efi / "EFI/OC/Kexts")
-            oc_install.KEXT_SRC = str(self.package / "target/Tahoe/Raphaeli.kext")
+            oc_install.KEXT_SRC = str(self.package / "target/Sequoia/Raphaeli.kext")
             oc_install.KEXT_SRC_EXPLICIT = True
-            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.TARGET_SELECTOR = "sequoia"
             oc_install.SYSTEM_ROOT_SET = False
             oc_install.SYS_ROOT = str(self.root / "system")
             oc_install.FW_SRC = str(source)
@@ -374,14 +368,14 @@ class TargetResolutionTest(unittest.TestCase):
             {"BundlePath": "Raphaeli.kext", "Enabled": True, "Marker": "drop"},
         ]}}))
         result = self._run_add(
-            "--target", "tahoe",
-            "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"),
+            "--target", "sequoia",
+            "--kext-src", str(self.package / "target" / "Sequoia" / "Raphaeli.kext"),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         entries = plistlib.loads(config.read_bytes())["Kernel"]["Add"]
         self.assertEqual([entry["BundlePath"] for entry in entries], ["Raphaeli.kext", "Other.kext"])
         self.assertEqual(entries[0]["Marker"], "keep")
-        self.assertEqual((entries[0]["MinKernel"], entries[0]["MaxKernel"]), ("25.0.0", "25.99.99"))
+        self.assertEqual((entries[0]["MinKernel"], entries[0]["MaxKernel"]), ("24.0.0", "24.99.99"))
 
     def test_kext_override_requires_known_target_and_uses_override(self):
         override = self.root / "override" / "Raphaeli.kext"
@@ -392,14 +386,14 @@ class TargetResolutionTest(unittest.TestCase):
 
     def test_status_reports_selected_target_and_bounds(self):
         result = self._run_add(
-            "--target", "tahoe",
-            "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"),
+            "--target", "sequoia",
+            "--kext-src", str(self.package / "target" / "Sequoia" / "Raphaeli.kext"),
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        result = self._run_action("--status", "--target", "tahoe")
+        result = self._run_action("--status", "--target", "sequoia")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("target:            Tahoe", result.stdout)
-        self.assertIn("MinKernel=25.0.0, MaxKernel=25.99.99", result.stdout)
+        self.assertIn("target:            Sequoia", result.stdout)
+        self.assertIn("MinKernel=24.0.0, MaxKernel=24.99.99", result.stdout)
 
     def test_status_infers_target_from_existing_entry_bounds(self):
         config = self.efi / "EFI" / "OC" / "config.plist"

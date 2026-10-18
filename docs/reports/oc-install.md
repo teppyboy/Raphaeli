@@ -106,6 +106,18 @@ git diff --check
 Results: 12 target tests passed; OpenCore shell integration passed; compile and
 whitespace checks passed.
 
+## Tahoe fail-closed fixture update
+
+`Raphaeli/Kernel/Accel/upstream/SOURCE.lock` remains authoritative with
+`tahoe_target_validated=no`. Target-resolution coverage now explicitly asserts
+Tahoe rejection for both the explicit selector and macOS 26 system-root
+selection. Successful `--add`, metadata-stamping, transactional rollback, and
+status fixtures select Sequoia, so those tests exercise action success without
+fabricating Tahoe validation.
+
+Validation also covered target, OpenCore, Recovery, package, and source test
+suites; Python compilation, Bash syntax, and `git diff --check` passed.
+
 ## Files
 
 - `xkpi/oc-install.py` (new, portable core)
