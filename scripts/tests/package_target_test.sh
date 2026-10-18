@@ -74,7 +74,6 @@ mk_kext "$ROOT/out/target/Tahoe/Raphaeli.kext" tahoe
 : > "$ROOT/out/usr/lib/libdrm.2.dylib"
 : > "$ROOT/out/usr/lib/libdrm_amdgpu.1.dylib"
 : > "$ROOT/out/usr/lib/libvulkan_radeon.dylib"
-: > "$ROOT/out/usr/lib/radeon_icd.x86_64.json"
 : > "$ROOT/firmware/amdgpu/test.bin"
 for firmware_name in \
   gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \
@@ -142,6 +141,10 @@ for selector in sequoia tahoe all; do
   archive=$(archive_path)
   [ -n "$archive" ] || { bad "$selector archive produced"; continue; }
   assert_archive_has "$archive" "$(basename "${archive%.zip}")/usr/lib/libvulkan_radeon.dylib" "$selector shared userspace staged"
+  icd_path="$(basename "${archive%.zip}")/usr/lib/radeon_icd.x86_64.json"
+  assert_archive_has "$archive" "$icd_path" "$selector generated ICD staged"
+  assert_archive_text "$archive" "$icd_path" '"library_path": "libvulkan_radeon.dylib"' "$selector generated ICD library path"
+  assert_archive_text "$archive" "$icd_path" '"api_version": "1.4.363"' "$selector generated ICD API version"
   assert_archive_has "$archive" "$(basename "${archive%.zip}")/firmware/amdgpu/test.bin" "$selector shared firmware staged"
   install_path="$(basename "${archive%.zip}")/INSTALL.md"
   assert_archive_has "$archive" "$install_path" "$selector INSTALL.md staged"

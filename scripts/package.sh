@@ -181,8 +181,21 @@ for target_name in $TARGET_NAMES; do
   target_kext="out/target/$target_name/Raphaeli.kext"
   stage_kext "$target_kext" "$STAGE/target/$target_name/Raphaeli.kext"
 done
-cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
+if [ -f out/usr/lib/radeon_icd.x86_64.json ]; then
+  cp out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/"
+else
+  cat > "$STAGE/usr/lib/radeon_icd.x86_64.json" <<'EOF'
+{
+    "ICD": {
+        "api_version": "1.4.363",
+        "library_arch": "64",
+        "library_path": "libvulkan_radeon.dylib"
+    },
+    "file_format_version": "1.0.1"
+}
+EOF
+fi
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
 cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-stage-graphics.py scripts/oc-install.py scripts/oc-install.sh scripts/target-preflight.sh "$STAGE/tools/"
 cp Raphaeli/Kernel/Accel/upstream/SOURCE.lock "$STAGE/tools/"
