@@ -15,6 +15,21 @@
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/IORangeAllocator.h>
 
+/* Tahoe changed private IOAcceleratorFamily2 method visibility and several types.
+ * The forwarding header is generated from the matching Tahoe SDK/KC outside this
+ * repository. Never fall back to the Sequoia private ABI for a Tahoe build. */
+#if defined(NM_TAHOE)
+# if defined(__has_include)
+#  if __has_include("nmx_accel_tahoe_forwarding.h")
+#   include "nmx_accel_tahoe_forwarding.h"
+#  else
+#   error "NM_TAHOE requires generated nmx_accel_tahoe_forwarding.h"
+#  endif
+# else
+#  error "NM_TAHOE requires generated Tahoe accelerator forwarding headers"
+# endif
+#endif
+
 #define ACCELLOG(fmt, ...) IOLog("Raphaeli accel: " fmt "\n", ##__VA_ARGS__)
 
 /* the family, reconstructed (vtable order + sizes verified against the shipped binary by the reference driver) */

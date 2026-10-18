@@ -3,20 +3,42 @@
 # srcobj/ (FreeBSD-on-xnu layer) and xnuobj/ (IOKit glue). Run build.sh + rt.sh first.
 set -euo pipefail
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
-OUT=${1:-$X/out}
+TARGET_SELECTOR=sequoia
+OUT_ARG=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --target) shift; [ "$#" -gt 0 ] || { echo "link.sh: --target requires sequoia, tahoe, or all" >&2; exit 1; }; TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
+        --target=*) TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
+        --help|-h) echo "usage: scripts/link.sh [out-dir] [--target sequoia|tahoe|all]"; exit 0 ;;
+        --*) echo "link.sh: unknown option $1" >&2; exit 1 ;;
+        *) [ -z "$OUT_ARG" ] || { echo "link.sh: output specified more than once" >&2; exit 1; }; OUT_ARG=$1 ;;
+    esac
+    shift
+done
+case "$TARGET_SELECTOR" in sequoia|tahoe|all) ;; *) echo "link.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;; esac
+OUT=${OUT_ARG:-$X/out}
 cd "$X"
 
-# stale non-Mach-O objects from failed header compiles would abort the link
-for f in obj/*.o lkobj/*.o srcobj/*.o xnuobj/*.o; do
-    file -b "$f" | grep -q Mach-O || { echo "stale object: $f"; rm "$f"; }
-done
+link_target() {
+    target=$1
+    case "$target" in sequoia) name=Sequoia ;; tahoe) name=Tahoe ;; esac
+    OBJROOT="$X/obj/target/$name"
+    LKOBJ="$OBJROOT/lkobj"; SRCOBJ="$OBJROOT/srcobj"; XNUOBJ="$OBJROOT/xnuobj"
+    OUT_TARGET="$OUT/target/$name"
+    export NMX_TARGET="$target" NMX_OBJ_ROOT="$XNUOBJ"
+    mkdir -p "$OUT_TARGET"
+    for f in "$OBJROOT"/*.o "$LKOBJ"/*.o "$SRCOBJ"/*.o "$XNUOBJ"/*.o; do
+        [ -e "$f" ] || continue
+        file -b "$f" | grep -q Mach-O || { echo "stale object: $f"; rm "$f"; }
+    done
 
+# stale non-Mach-O objects from failed header compiles would abort the link
 # ---- embedded firmware: every blob in firmware/amdgpu/ is linked into the binary (generated object + table),
 # so OC injection alone equips the driver - no /Library/Raphaeli staging, no post-install scripts. The same
 # blobs are copied into Contents/Resources/firmware/amdgpu for inspection. nmx_platform.cpp reads FIRMWARE_ROOT
 # first and falls back to the table, so adding blobs to firmware/amdgpu/ is zero-code.
 FWDIR=firmware/amdgpu
-FWGEN=xnuobj/fwgen
+FWGEN="$XNUOBJ/fwgen"
 mkdir -p "$FWGEN"
 FW_BINS=$(ls "$FWDIR"/*.bin 2>/dev/null || true)
 missing_fw=0
@@ -60,19 +82,19 @@ done
     echo '}'
 } > "$FWGEN/nmx_firmware_table.cpp"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -c "$FWGEN/nmx_firmware_blobs.S" -o "$FWGEN/nmx_firmware_blobs.o"
-NMX_OBJ="$X/$FWGEN/nmx_firmware_table.o" "$X/scripts/ccxx.sh" "$X/$FWGEN/nmx_firmware_table.cpp" > xlog_nmx_firmware_table.txt 2>&1 || {
+NMX_OBJ="$X/$FWGEN/nmx_firmware_table.o" NMX_TARGET="$target" "$X/scripts/ccxx.sh" "$X/$FWGEN/nmx_firmware_table.cpp" > xlog_nmx_firmware_table.txt 2>&1 || {
     grep -A3 error: xlog_nmx_firmware_table.txt | head; exit 1; }
 FWOBJ="$X/$FWGEN/nmx_firmware_blobs.o $X/$FWGEN/nmx_firmware_table.o"
 FW_N=$(printf '%s\n' $FW_BINS | grep -c . || true)
 FW_BYTES=0
 [ -n "$FW_BINS" ] && FW_BYTES=$(cat $FW_BINS 2>/dev/null | wc -c | tr -d ' ') || true
 
-K="$OUT/Raphaeli.kext/Contents"
+K="$OUT_TARGET/Raphaeli.kext/Contents"
 mkdir -p "$K/MacOS"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlinker -kext \
   -Xlinker -source_version -Xlinker 1.0.0 \
-  obj/*.o lkobj/*.o srcobj/*.o xnuobj/nmx_kext.o xnuobj/nmx_devfs.o xnuobj/nmx_dma.o \
-  xnuobj/nmx_fb.o xnuobj/nmx_accel.o xnuobj/nmx_accel_uc.o xnuobj/nmx_mm.o xnuobj/nmx_pci.o xnuobj/nmx_platform.o xnuobj/nmx_vm.o \
+  "$OBJROOT"/*.o "$LKOBJ"/*.o "$SRCOBJ"/*.o "$XNUOBJ"/nmx_kext.o "$XNUOBJ"/nmx_devfs.o "$XNUOBJ"/nmx_dma.o \
+  "$XNUOBJ"/nmx_fb.o "$XNUOBJ"/nmx_accel.o "$XNUOBJ"/nmx_accel_uc.o "$XNUOBJ"/nmx_mm.o "$XNUOBJ"/nmx_pci.o "$XNUOBJ"/nmx_platform.o "$XNUOBJ"/nmx_vm.o \
   $FWOBJ \
   -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
     grep -E "error|Undefined|duplicate" link.log | head -40; exit 1; }
@@ -80,7 +102,14 @@ cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 mkdir -p "$K/Resources/firmware/amdgpu"
 [ -n "$FW_BINS" ] && cp "$FWDIR"/*.bin "$K/Resources/firmware/amdgpu/"
 echo "firmware embedded: ${FW_N:-0} blobs, ${FW_BYTES:-0} B; Resources copy: $K/Resources/firmware/amdgpu"
-echo "Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B"
+echo "$target Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B"
+# kmutil silently classifies kexts not owned by root:wheel as codeless ('No binaries or
+# codeless kexts were provided') regardless of signature; fix ownership before building the auxKC:
+if [ "$(stat -f %u "$K/MacOS/Raphaeli")" != 0 ]; then
+    echo "WARNING: Raphaeli.kext not owned by root:wheel; kmutil will treat it as codeless. Run the chown above."
+fi
+}
+case "$TARGET_SELECTOR" in all) link_target sequoia && link_target tahoe ;; *) link_target "$TARGET_SELECTOR" ;; esac
 # kmutil silently classifies kexts not owned by root:wheel as codeless ('No binaries or
 # codeless kexts were provided') regardless of signature; fix ownership before building the auxKC:
 #   sudo chown -R root:wheel "$OUT/Raphaeli.kext" && sudo chmod -R 755 "$OUT/Raphaeli.kext"
@@ -88,6 +117,3 @@ echo "Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K
 #     -A /tmp/raphaeli-auxkc -B /System/Library/KernelCollections/BootKernelExtensions.kc \
 #     -S /System/Library/KernelCollections/SystemKernelExtensions.kc \
 #     --kdk /Library/Developer/KDKs/KDK_15.7.8_24G824.kdk
-if [ "$(stat -f %u "$K/MacOS/Raphaeli")" != 0 ]; then
-    echo "WARNING: Raphaeli.kext not owned by root:wheel; kmutil will treat it as codeless. Run the chown above."
-fi
