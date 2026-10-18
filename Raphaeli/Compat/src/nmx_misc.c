@@ -86,6 +86,8 @@ size_t strcspn(const char *s, const char *charset)
 }
 
 /* xnu offers kexts neither strrchr nor strstr */
+char *nmx_compat_strnstr(const char *s, const char *find, size_t slen);
+
 char *strrchr(const char *s, int c)
 {
     const char *last = NULL;
@@ -98,7 +100,7 @@ char *strrchr(const char *s, int c)
 
 char *strstr(const char *s, const char *find)
 {
-    return strnstr(s, find, strlen(s) + 1);
+    return nmx_compat_strnstr(s, find, strlen(s) + 1);
 }
 
 char *strchrnul(const char *s, int c)
@@ -595,7 +597,7 @@ void funsetown(struct sigio **sigiop)
 
 /*
  * libkern functions xnu declares in its headers but does not export to kexts (a kmutil link of the kext names
- * them): fls, flsll, strnstr, qsort, strtoll, strtoull, suword64.
+ * them): fls, flsll, nmx_compat_strnstr, qsort, strtoll, strtoull, suword64.
  */
 int fls(unsigned int x)
 {
@@ -607,7 +609,7 @@ int flsll(unsigned long long x)
     return x ? 64 - __builtin_clzll(x) : 0;
 }
 
-char *strnstr(const char *s, const char *find, size_t slen)
+char *nmx_compat_strnstr(const char *s, const char *find, size_t slen)
 {
     size_t len = strlen(find);
     if (len == 0)

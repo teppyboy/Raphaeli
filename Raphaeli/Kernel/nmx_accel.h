@@ -15,6 +15,8 @@
 #include <IOKit/IOBufferMemoryDescriptor.h>
 #include <IOKit/IORangeAllocator.h>
 
+#define ACCELLOG(fmt, ...) IOLog("Raphaeli accel: " fmt "\n", ##__VA_ARGS__)
+
 /* Tahoe changed private IOAcceleratorFamily2 method visibility and several types.
  * The forwarding header is generated from the matching Tahoe SDK/KC outside this
  * repository. Never fall back to the Sequoia private ABI for a Tahoe build. */
