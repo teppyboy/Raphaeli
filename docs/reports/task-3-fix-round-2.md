@@ -13,6 +13,11 @@
 
 Recovery fixture covers Sequoia/Tahoe bundle resolution, explicit override precedence, and missing userspace/firmware inputs. Packaging fixture covers archive marker content and required input failures.
 
+## Round 3 test fixes
+
+- Recovery fixture uses distinct Sequoia/Tahoe executable markers, runs each target with `--apply`, and verifies the installed marker.
+- Recovery and package fixtures table-drive every required userspace dylib and firmware blob failure.
+
 ## Notes
 
 No hardware validation. Existing unrelated worktree changes untouched.

@@ -162,21 +162,27 @@ for selector in sequoia tahoe all; do
   esac
 done
 
-# Every required input failure must be explicit, including each target bundle and
-# shared userspace/firmware inputs.
+# Every required input failure must be explicit, including each target bundle
+# and each shared userspace/firmware input.
 for missing_target in Sequoia Tahoe; do
   mv "$ROOT/out/target/$missing_target" "$TMP/$missing_target.missing"
   assert_package_fails --target all "missing $missing_target input rejected"
   mv "$TMP/$missing_target.missing" "$ROOT/out/target/$missing_target"
 done
-mv "$ROOT/out/usr/lib" "$TMP/lib.missing"
-assert_package_fails --target sequoia "missing userspace input rejected"
-mkdir -p "$ROOT/out"
-mv "$TMP/lib.missing" "$ROOT/out/usr/lib"
-mv "$ROOT/firmware/amdgpu" "$TMP/fw.missing"
-assert_package_fails --target sequoia "missing firmware input rejected"
-mkdir -p "$ROOT/firmware"
-mv "$TMP/fw.missing" "$ROOT/firmware/amdgpu"
+for userspace_name in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do
+  mv "$ROOT/out/usr/lib/$userspace_name" "$TMP/$userspace_name.missing"
+  assert_package_fails --target sequoia "missing userspace input: $userspace_name"
+  mv "$TMP/$userspace_name.missing" "$ROOT/out/usr/lib/$userspace_name"
+done
+for firmware_name in \
+  gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \
+  gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin \
+  sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin \
+  vcn_4_0_2.bin dcn_3_1_4_dmcub.bin; do
+  mv "$ROOT/firmware/amdgpu/$firmware_name" "$TMP/$firmware_name.missing"
+  assert_package_fails --target sequoia "missing firmware input: $firmware_name"
+  mv "$TMP/$firmware_name.missing" "$ROOT/firmware/amdgpu/$firmware_name"
+done
 
 echo "passed=$((fail == 0 ? 1 : 0)) failed=$fail"
 exit "$fail"

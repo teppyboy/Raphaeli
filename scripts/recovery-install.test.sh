@@ -49,6 +49,9 @@ plutil -insert CFBundleIdentifier -string me.tretrauit.raphaeli \
 printf 'fixture executable\n' > "$KEXT/Contents/MacOS/raphaeli"; chmod +x "$KEXT/Contents/MacOS/raphaeli"
 cp -R "$KEXT" "$DIST/target/Sequoia/Raphaeli.kext"
 cp -R "$KEXT" "$DIST/target/Tahoe/Raphaeli.kext"
+printf 'fixture executable sequoia\n' > "$DIST/target/Sequoia/Raphaeli.kext/Contents/MacOS/raphaeli"
+printf 'fixture executable tahoe\n' > "$DIST/target/Tahoe/Raphaeli.kext/Contents/MacOS/raphaeli"
+chmod +x "$DIST/target/Sequoia/Raphaeli.kext/Contents/MacOS/raphaeli" "$DIST/target/Tahoe/Raphaeli.kext/Contents/MacOS/raphaeli"
 
 : > "$DIST/usr/lib/libvulkan_radeon.dylib"
 : > "$DIST/usr/lib/libdrm.2.dylib"
@@ -117,6 +120,24 @@ KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
 run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
 t "explicit kext override wins" 0 run_override "$V1" --target tahoe --dry-run
 assert_out "override selected" "$KEXT_OVERRIDE"
+
+# Target selection must install the matching executable, not merely print its path.
+V_TARGET_SEQUOIA=$(newvol "Sequoia target HD")
+t "Sequoia target apply succeeds" 0 run_inst "$V_TARGET_SEQUOIA" --target sequoia --apply
+if grep -q '^fixture executable sequoia$' "$V_TARGET_SEQUOIA/Library/Extensions/Raphaeli.kext/Contents/MacOS/raphaeli"; then
+  echo "ok    Sequoia executable marker installed"; pass=$((pass + 1))
+else
+  echo "FAIL  Sequoia executable marker installed"; fail=$((fail + 1))
+fi
+V_TARGET_TAHOE=$(newvol "Tahoe target HD")
+t "Tahoe target apply succeeds" 0 run_inst "$V_TARGET_TAHOE" --target tahoe --apply
+if grep -q '^fixture executable tahoe$' "$V_TARGET_TAHOE/Library/Extensions/Raphaeli.kext/Contents/MacOS/raphaeli"; then
+  echo "ok    Tahoe executable marker installed"; pass=$((pass + 1))
+else
+  echo "FAIL  Tahoe executable marker installed"; fail=$((fail + 1))
+fi
+rm -rf "$V_TARGET_SEQUOIA" "$V_TARGET_TAHOE"
+printf 'boot-args\tnv_disable=1\n' > "$NVRAM_STATE"
 
 rm -rf "$V2"                          # single candidate -> auto-detected
 out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" --dry-run 2>&1)
@@ -202,12 +223,20 @@ assert_out "skips kext copy"          "skipping kext copy + auxKC"
 
 # ---- required input failures --------------------------------------------------
 
-mv "$DIST/usr/lib/libvulkan_radeon.dylib" "$WORK/libvulkan_radeon.dylib.missing"
-t "missing required userspace input aborts" 1 run_inst "$V1" --dry-run
-mv "$WORK/libvulkan_radeon.dylib.missing" "$DIST/usr/lib/libvulkan_radeon.dylib"
-mv "$DIST/firmware/amdgpu/vcn_4_0_2.bin" "$WORK/vcn_4_0_2.bin.missing"
-t "missing required firmware input aborts" 1 run_inst "$V1" --dry-run
-mv "$WORK/vcn_4_0_2.bin.missing" "$DIST/firmware/amdgpu/vcn_4_0_2.bin"
+for userspace_name in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do
+  mv "$DIST/usr/lib/$userspace_name" "$WORK/$userspace_name.missing"
+  t "missing required userspace input: $userspace_name" 1 run_inst "$V1" --dry-run
+  mv "$WORK/$userspace_name.missing" "$DIST/usr/lib/$userspace_name"
+done
+for firmware_name in \
+  gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \
+  gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin \
+  sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin \
+  vcn_4_0_2.bin dcn_3_1_4_dmcub.bin; do
+  mv "$DIST/firmware/amdgpu/$firmware_name" "$WORK/$firmware_name.missing"
+  t "missing required firmware input: $firmware_name" 1 run_inst "$V1" --dry-run
+  mv "$WORK/$firmware_name.missing" "$DIST/firmware/amdgpu/$firmware_name"
+done
 
 # ---- checksum manifest --------------------------------------------------------
 
