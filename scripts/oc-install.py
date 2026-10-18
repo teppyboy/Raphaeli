@@ -679,27 +679,27 @@ def action_remove() -> None:
     kext_backup = staged + ".raphaeli-remove"
     if os.path.exists(kext_backup):
         die(f"remove transaction path already exists: {kext_backup}")
-    copied = False
+    moved = False
     try:
-        # Delete the live bundle before config commit. A private copy makes that
-        # destructive step reversible if the later atomic config write fails.
+        # Move the live bundle aside atomically before config commit. Keeping it
+        # in the same directory makes the removal reversible without a partial
+        # copy or delete.
         if os.path.exists(staged):
-            shutil.copytree(staged, kext_backup, symlinks=True)
-            copied = True
-            shutil.rmtree(staged)
+            os.replace(staged, kext_backup)
+            moved = True
         else:
             log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
         if indices:
             for idx in reversed(indices):
                 cfg["Kernel"]["Add"].pop(idx)
             save_config(cfg)
-        if copied and os.path.exists(kext_backup):
+        if moved and os.path.exists(kext_backup):
             remove_path(kext_backup)
     except BaseException:
         try:
             restore_config_bytes(original_config)
-            if copied and not os.path.exists(staged) and os.path.exists(kext_backup):
-                shutil.copytree(kext_backup, staged, symlinks=True)
+            if moved and not os.path.exists(staged) and os.path.exists(kext_backup):
+                os.replace(kext_backup, staged)
         except BaseException:
             raise
         finally:

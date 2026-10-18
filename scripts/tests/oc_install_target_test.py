@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -301,12 +301,13 @@ class TargetResolutionTest(unittest.TestCase):
         self.assertFalse(firmware_root.exists())
         self.assertFalse((self.root / "system/Library/Raphaeli/firmware.raphaeli-staging").exists())
 
-    def test_remove_failure_preserves_config_and_staged_kext(self):
+    def test_remove_rename_failure_preserves_config_and_staged_kext(self):
         config = self.efi / "EFI/OC/config.plist"
         config.write_bytes(plistlib.dumps({"Kernel": {"Add": [
             {"BundlePath": "Raphaeli.kext", "Enabled": True}]}}))
         staged = self.efi / "EFI/OC/Kexts/Raphaeli.kext"
         self._make_kext(staged)
+        backup = staged.parent / "Raphaeli.kext.raphaeli-remove"
         before = config.read_bytes()
         staged_before = {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()}
         old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.DRY_RUN)
@@ -314,12 +315,12 @@ class TargetResolutionTest(unittest.TestCase):
             oc_install.CONFIG = str(config)
             oc_install.KEXTS_DIR = str(staged.parent)
             oc_install.DRY_RUN = False
-            real_rmtree = oc_install.shutil.rmtree
-            def fail_staged(path, *args, **kwargs):
-                if path == str(staged):
-                    raise OSError("simulated delete failure")
-                return real_rmtree(path, *args, **kwargs)
-            with patch.object(oc_install.shutil, "rmtree", side_effect=fail_staged), \
+            real_replace = oc_install.os.replace
+            def fail_staged(source, destination):
+                if source == str(staged) and destination == str(backup):
+                    raise OSError("simulated rename failure")
+                return real_replace(source, destination)
+            with patch.object(oc_install.os, "replace", side_effect=fail_staged), \
                     self.assertRaises(OSError):
                 oc_install.action_remove()
         finally:
@@ -329,7 +330,32 @@ class TargetResolutionTest(unittest.TestCase):
             {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()},
             staged_before,
         )
-        self.assertFalse((staged.parent / "Raphaeli.kext.raphaeli-remove").exists())
+        self.assertFalse(backup.exists())
+
+    def test_remove_config_failure_restores_kext_with_rename(self):
+        config = self.efi / "EFI/OC/config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [
+            {"BundlePath": "Raphaeli.kext", "Enabled": True}]}}))
+        staged = self.efi / "EFI/OC/Kexts/Raphaeli.kext"
+        self._make_kext(staged)
+        backup = staged.parent / "Raphaeli.kext.raphaeli-remove"
+        before = config.read_bytes()
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(staged.parent)
+            oc_install.DRY_RUN = False
+            real_replace = oc_install.os.replace
+            with patch.object(oc_install, "save_config", side_effect=OSError("simulated config failure")), \
+                    patch.object(oc_install.os, "replace", wraps=real_replace) as replace:
+                with self.assertRaises(OSError):
+                    oc_install.action_remove()
+        finally:
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), before)
+        self.assertTrue(staged.is_dir())
+        self.assertFalse(backup.exists())
+        self.assertIn(call(str(backup), str(staged)), replace.call_args_list)
 
     def test_duplicate_entries_keep_first_and_remove_only_raphaeli(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
