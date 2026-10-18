@@ -52,11 +52,10 @@ Task: `Raphaeli/xkpi/install.sh` for the 780M target machine. Status: implemente
 - shellcheck: not installed on this host (`command -v shellcheck` empty); the harness lints both
   scripts clean of the patterns I could check by eye; install shellcheck separately if wanted.
 
-## Gap found (needs the target machine's firmware source)
+## Firmware census
 
-`Raphaeli/firmware/amdgpu/` has 13/14 expected blobs but **`ip_discovery.bin` is missing** — the
-census correctly refuses install until it is fetched from linux-firmware (amdgpu/) and placed in
-`Raphaeli/firmware/amdgpu/`.
+`Raphaeli/firmware/amdgpu/` contains the required firmware blobs. `ip_discovery.bin` is optional
+per `Raphaeli/Firmware/stage.sh` and is not part of the installer required census.
 
 ## Open risks
 

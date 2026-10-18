@@ -36,6 +36,8 @@ trap 'rm -rf "$WORK"' EXIT
 DIST=$WORK/dist
 mkdir -p "$DIST"/{tools/fw,usr/lib,firmware/amdgpu,target/Sequoia,target/Tahoe}
 cp "$HERE/recovery-install.sh" "$DIST/tools/"
+cp "$HERE/target-preflight.sh" "$DIST/tools/"
+cp "$HERE/../Raphaeli/Kernel/Accel/upstream/SOURCE.lock" "$DIST/tools/"
 cp "$HERE/../Raphaeli/Firmware/stage.sh" "$DIST/tools/fw/"
 
 # minimal kext bundle: Contents/Info.plist + executable, correct bundle id
@@ -118,8 +120,8 @@ t "two candidates: explicit still ok" 0 run_inst "$V2" --dry-run
 
 t "Sequoia target resolves package bundle" 0 run_inst "$V1" --target sequoia --dry-run
 assert_out "Sequoia bundle selected" "$DIST/target/Sequoia/Raphaeli.kext"
-t "Tahoe target resolves package bundle" 0 run_inst "$V1" --target=tahoe --dry-run
-assert_out "Tahoe bundle selected" "$DIST/target/Tahoe/Raphaeli.kext"
+t "unvalidated Tahoe target is refused" 1 run_inst "$V1" --target=tahoe --dry-run
+assert_out "Tahoe validation gate reported" "tahoe_target_validated=no"
 # The packaged script must not silently fall back to the repository firmware census.
 # Remove the package copy while keeping the source-tree copy available.
 mv "$DIST/tools/fw/stage.sh" "$WORK/stage.sh.missing"
@@ -128,8 +130,8 @@ assert_out "missing packaged stage path reported" "$DIST/tools/fw/stage.sh"
 mv "$WORK/stage.sh.missing" "$DIST/tools/fw/stage.sh"
 KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
 run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
-t "explicit kext override wins" 0 run_override "$V1" --target tahoe --dry-run
-assert_out "override selected" "$KEXT_OVERRIDE"
+t "Tahoe override remains fail-closed" 1 run_override "$V1" --target tahoe --dry-run
+assert_out "override validation gate reported" "tahoe_target_validated=no"
 
 # Target selection must install the matching executable, not merely print its path.
 V_TARGET_SEQUOIA=$(newvol "Sequoia target HD")
@@ -140,12 +142,7 @@ else
   echo "FAIL  Sequoia executable marker installed"; fail=$((fail + 1))
 fi
 V_TARGET_TAHOE=$(newvol "Tahoe target HD")
-t "Tahoe target apply succeeds" 0 run_inst "$V_TARGET_TAHOE" --target tahoe --apply
-if grep -q '^fixture executable tahoe$' "$V_TARGET_TAHOE/Library/Extensions/Raphaeli.kext/Contents/MacOS/raphaeli"; then
-  echo "ok    Tahoe executable marker installed"; pass=$((pass + 1))
-else
-  echo "FAIL  Tahoe executable marker installed"; fail=$((fail + 1))
-fi
+t "unvalidated Tahoe apply is refused" 1 run_inst "$V_TARGET_TAHOE" --target tahoe --apply
 rm -rf "$V_TARGET_SEQUOIA" "$V_TARGET_TAHOE"
 printf 'boot-args\tnv_disable=1\n' > "$NVRAM_STATE"
 

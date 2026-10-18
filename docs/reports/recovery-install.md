@@ -57,7 +57,7 @@ from macOS Recovery") and covered by `scripts/recovery-install.test.sh`
 
 ## Usage
 ```bash
-recovery-install.sh /Volumes/Macintosh\ HD [--apply] [--dry-run]
+recovery-install.sh /Volumes/Macintosh\ HD --target sequoia [--apply] [--dry-run]
 recovery-install.sh /Volumes/Macintosh\ HD --uninstall
 ```
 

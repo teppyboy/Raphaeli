@@ -48,7 +48,6 @@ NVRAM_GUARD="raphaeli-gpu-attaching"
 
 # fw/README.md + fw/stage.sh: exactly the names amdgpu passes to request_firmware()
 REQUIRED_FW=(
-  ip_discovery.bin
   gc_11_0_1_pfp.bin
   gc_11_0_1_me.bin
   gc_11_0_1_rlc.bin

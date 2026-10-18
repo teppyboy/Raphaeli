@@ -54,19 +54,7 @@ ICD_DEST_REL="usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"
 ICD_LIBRARY_PATH="/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
 
 # fw/README.md + fw/stage.sh: exactly the names amdgpu passes to request_firmware()
-REQUIRED_FW=(
-  gc_11_0_1_pfp.bin
-  gc_11_0_1_me.bin
-  gc_11_0_1_rlc.bin
-  gc_11_0_1_mec.bin
-  gc_11_0_1_imu.bin
-  gc_11_0_1_mes1.bin
-  sdma_6_0_2.bin
-  psp_13_0_11_toc.bin
-  psp_13_0_11_ta.bin
-  vcn_4_0_2.bin
-  dcn_3_1_4_dmcub.bin
-)
+REQUIRED_FW="gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin vcn_4_0_2.bin dcn_3_1_4_dmcub.bin"
 
 DRY_RUN=0
 APPLY=0
@@ -129,6 +117,14 @@ done
 
 # Resolve the selected bundle after parsing so --target may appear anywhere.
 # RAPHAELI_KEXT is an explicit override and always takes precedence.
+if [[ $TARGET_SELECTOR == tahoe ]]; then
+  PREFLIGHT=$SRC_ROOT/tools/target-preflight.sh
+  [[ -x $PREFLIGHT ]] || PREFLIGHT=$SRC_ROOT/scripts/target-preflight.sh
+  LOCK=$SRC_ROOT/tools/SOURCE.lock
+  [[ -f $LOCK ]] || LOCK=$SRC_ROOT/Raphaeli/Kernel/Accel/upstream/SOURCE.lock
+  [[ -x $PREFLIGHT ]] || die "target preflight helper not found"
+  "$PREFLIGHT" tahoe "$LOCK" || die "Tahoe target is not validated"
+fi
 if [[ -z $KEXT_SRC ]]; then
   if [[ -n $TARGET_SELECTOR ]]; then
     KEXT_SRC=$SRC_ROOT/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
@@ -155,23 +151,23 @@ resolve_volume() {
     return
   fi
   local volsdir=${RAPHAELI_VOLUMES_DIR:-/Volumes}
-  local pref=() other=() d
+  pref=""; other=""; pref_count=0; other_count=0
   for d in "$volsdir"/*; do
     [[ -d $d ]] || continue
     if [[ -d $d/Library/Extensions ]]; then
-      pref+=("$d")
+      pref="$pref\n$d"; pref_count=$((pref_count + 1))
     elif [[ -d $d/Library ]]; then
-      other+=("$d")
+      other="$other\n$d"; other_count=$((other_count + 1))
     fi
   done
-  if ((${#pref[@]} == 1)); then
-    VOL=${pref[0]}
-  elif ((${#pref[@]} == 0 && ${#other[@]} == 1)); then
-    VOL=${other[0]}
+  if [[ $pref_count == 1 ]]; then
+    VOL=$(printf '%b\n' "$pref" | sed -n '2p')
+  elif [[ $pref_count == 0 && $other_count == 1 ]]; then
+    VOL=$(printf '%b\n' "$other" | sed -n '2p')
   else
     echo "candidates under $volsdir:" >&2
-    ((${#pref[@]})) && printf '  %s (has Library/Extensions)\n' "${pref[@]}" >&2
-    ((${#other[@]})) && printf '  %s\n' "${other[@]}" >&2
+    [[ $pref_count != 0 ]] && printf '%b\n' "$pref" | sed '1d;s|^|  |;s|$| (has Library/Extensions)|' >&2
+    [[ $other_count != 0 ]] && printf '%b\n' "$other" | sed '1d;s|^|  |' >&2
     usage >&2
     die "could not pick a unique target volume; pass it explicitly"
   fi
@@ -214,14 +210,14 @@ for userspace_file in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dyli
 done
 
 log "selected kext: $KEXT_SRC${TARGET_SELECTOR:+ (target $TARGET_SELECTOR)}"
-log "firmware census in $FW_SRC (required: ${#REQUIRED_FW[@]})"
-missing=()
-for f in "${REQUIRED_FW[@]}"; do
-  [[ -f $FW_SRC/$f ]] || missing+=("$f")
+log "firmware census in $FW_SRC (required blobs)"
+missing=""
+for f in $REQUIRED_FW; do
+  [[ -f $FW_SRC/$f ]] || missing="$missing $f"
 done
-if ((${#missing[@]})); then
+if [[ -n $missing ]]; then
   echo "MISSING REQUIRED firmware blobs:" >&2
-  for f in "${missing[@]}"; do echo "  amdgpu/$f" >&2; done
+  for f in $missing; do echo "  amdgpu/$f" >&2; done
   die "the dist zip should contain firmware/amdgpu/*.bin"
 fi
 

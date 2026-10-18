@@ -88,6 +88,35 @@ TARGETS = {
     "sequoia": ("Sequoia", "24.0.0", "24.99.99"),
     "tahoe": ("Tahoe", "25.0.0", "25.99.99"),
 }
+APPROVED_SOURCE_METADATA = {
+    "repository": "https://github.com/nullmoth/nvidia-macos-driver.git",
+    "commit": "637282334617d27bccf8aa2448497c0f19465dc8",
+    "source_path": "kexts/NVRM/accel",
+}
+
+
+def validate_target_metadata(target: str, package_root: str = "") -> None:
+    if target != "tahoe":
+        return
+    lock_candidates = (
+        os.path.join(package_root, "SOURCE.lock"),
+        os.path.join(SCRIPT_DIR, "SOURCE.lock"),
+        os.path.join(SCRIPT_DIR, "..", "Raphaeli", "Kernel", "Accel", "upstream", "SOURCE.lock"),
+    )
+    lock = next((p for p in lock_candidates if os.path.isfile(p)), "")
+    if not lock:
+        die("refusing Tahoe: SOURCE.lock is unavailable")
+    metadata = {}
+    with open(lock) as stream:
+        for line in stream:
+            if "=" in line:
+                key, value = line.rstrip("\n").split("=", 1)
+                metadata[key] = value
+    for key, expected in APPROVED_SOURCE_METADATA.items():
+        if metadata.get(key) != expected:
+            die(f"refusing Tahoe: SOURCE.lock {key} is not approved")
+    if metadata.get("tahoe_target_validated") != "yes":
+        die(f"refusing Tahoe: SOURCE.lock marks tahoe_target_validated={metadata.get('tahoe_target_validated', '')}")
 
 def resolve_target(explicit: str, system_root: str, package_root: str) -> TargetInfo:
     selector = explicit.strip().lower()
@@ -113,6 +142,7 @@ def resolve_target(explicit: str, system_root: str, package_root: str) -> Target
         else:
             die(f"unsupported ProductVersion {version!r}; supported versions are 15.x (Sequoia) and 26.x (Tahoe)")
         metadata = TARGETS[selector]
+    validate_target_metadata(selector, package_root)
     name, minimum, maximum = metadata
     source_candidates = (
         os.path.join(package_root, "target", name, KEXT_NAME),
@@ -457,6 +487,16 @@ def remove_path(path: str) -> None:
     else:
         os.unlink(path)
 
+def unique_backup_path(config: str, timestamp: str) -> str:
+    base = f"{config}.raphaeli-backup-{timestamp}"
+    candidate = base
+    suffix = 1
+    while os.path.exists(candidate):
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
 def prepare_staged_kext(source: str, staged: str, target: TargetInfo) -> str:
     """Build a sibling bundle before changing config.plist or staged output."""
     temporary = staged + ".raphaeli-staging"
@@ -536,7 +576,7 @@ def action_add() -> None:
             print(f"DRY-RUN: refresh :Kernel>Add:{idx} for {target.name}")
         else:
             ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-            backup = f"{CONFIG}.raphaeli-backup-{ts}"
+            backup = unique_backup_path(CONFIG, ts)
             print("DRY-RUN: cp", CONFIG, backup)
             print(f"DRY-RUN: append Raphaeli.kext to :Kernel:Add")
         copy_kext(source, staged)
@@ -559,7 +599,7 @@ def action_add() -> None:
     # Keep a restorable original before mutating bounds, comments, duplicates,
     # or inserting a new entry. The backup is part of the install contract.
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup = f"{CONFIG}.raphaeli-backup-{ts}"
+    backup = unique_backup_path(CONFIG, ts)
     log(f"backing up config.plist -> {os.path.basename(backup)}")
     try:
         shutil.copy2(CONFIG, backup)
@@ -817,6 +857,7 @@ def main(argv: "list[str]") -> int:
                 target = a
             elif SYS_ROOT == "/":
                 SYS_ROOT = a
+                SYSTEM_ROOT_SET = True
             else:
                 die(f"unexpected argument: {a}")
         i += 1

@@ -28,6 +28,8 @@ class TargetResolutionTest(unittest.TestCase):
         self._make_efi()
         self._make_kext(self.package / "target" / "Sequoia" / "Raphaeli.kext")
         self._make_kext(self.package / "target" / "Tahoe" / "Raphaeli.kext")
+        lock = (ROOT / "Raphaeli" / "Kernel" / "Accel" / "upstream" / "SOURCE.lock").read_text()
+        (self.package / "SOURCE.lock").write_text(lock.replace("tahoe_target_validated=no", "tahoe_target_validated=yes"))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -81,6 +83,12 @@ class TargetResolutionTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def test_unvalidated_tahoe_lock_fails_closed(self):
+        lock = self.package / "SOURCE.lock"
+        lock.write_text(lock.read_text().replace("tahoe_target_validated=yes", "tahoe_target_validated=no"))
+        with self.assertRaises(SystemExit):
+            oc_install.resolve_target("tahoe", "", str(self.package))
 
     def test_explicit_targets_select_bundle_and_bounds(self):
         sequoia = oc_install.resolve_target("sequoia", "", str(self.package))

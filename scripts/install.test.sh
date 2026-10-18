@@ -29,19 +29,21 @@ assert_out() { # assert_out <name> <pattern> (uses $out from last t)
   fi
 }
 
-KEXT="$HERE/../out/Raphaeli.kext"
+KEXT=$(mktemp -d)/Raphaeli.kext
+mkdir -p "$KEXT/Contents/MacOS"
+printf '<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string><key>CFBundleExecutable</key><string>Raphaeli</string></dict></plist>' > "$KEXT/Contents/Info.plist"
+printf 'me.tretrauit.raphaeli\n' > "$KEXT/Contents/MacOS/Raphaeli"
 TMPFW=$(mktemp -d)
 
-# full dry-run with a complete temp firmware source (real sources lack ip_discovery.bin)
-cp /Users/yuuki/Documents/tretrauit/code/Raphaeli/firmware/amdgpu/*.bin "$TMPFW"/
-: > "$TMPFW/ip_discovery.bin"
+# full dry-run with a complete temp firmware source
+cp "$HERE/../firmware/amdgpu/"*.bin "$TMPFW"/
 
 t "help exits 0"              0 "$INSTALL" --help
 t "unknown option fails"      1 "$INSTALL" --bogus
 t "two kext paths fail"       1 "$INSTALL" "$KEXT" "$KEXT"
 t "nonexistent kext fails"    1 "$INSTALL" --dry-run /tmp/no-such.kext
 
-RAPHAELI_FW_SRC=$TMPFW t "full dry-run succeeds" 0 env RAPHAELI_FW_SRC=$TMPFW "$INSTALL" --dry-run
+RAPHAELI_FW_SRC=$TMPFW t "full dry-run succeeds" 0 env RAPHAELI_FW_SRC=$TMPFW "$INSTALL" --dry-run "$KEXT"
 assert_out "dry-run prints ditto"        "DRY-RUN: sudo ditto"
 assert_out "dry-run prints chown"        "DRY-RUN: sudo chown -R root:wheel /Library/Extensions/Raphaeli.kext"
 assert_out "dry-run prints stage.sh"     "DRY-RUN: sudo sh *Firmware/stage.sh"
@@ -53,7 +55,7 @@ assert_out "does not set boot-args"      "not applying boot-args"
 
 # missing-firmware census abort with clear message
 rm "$TMPFW/psp_13_0_11_toc.bin"
-t "missing firmware aborts" 1 env RAPHAELI_FW_SRC=$TMPFW "$INSTALL" --dry-run
+t "missing firmware aborts" 1 env RAPHAELI_FW_SRC=$TMPFW "$INSTALL" --dry-run "$KEXT"
 assert_out "lists missing file"     "amdgpu/psp_13_0_11_toc.bin"
 assert_out "says where to fetch"    "linux-firmware"
 

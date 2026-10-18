@@ -1,6 +1,6 @@
 # pkg installer lane — native .pkg installer
 
-`scripts/make-pkg.sh [out-dir] [--with-kext]` builds `dist/Raphaeli-<hash>-x86_64.pkg`
+`scripts/make-pkg.sh [out-dir] [--target sequoia|tahoe] [--with-kext]` builds `dist/Raphaeli-<hash>-x86_64.pkg`
 with `pkgbuild` + `productbuild` (no shell-script download, no zip). Built and validated
 on macOS 15.7.8 (24G824), commit `e027e5d`.
 
@@ -38,7 +38,7 @@ Pkg sizes: **7.3 MB** (userspace+firmware), **11.1 MB** (with kext). Distributio
 
 ```text
 ./scripts/make-pkg.sh dist
-./scripts/make-pkg.sh dist --with-kext
+./scripts/make-pkg.sh dist --target sequoia --with-kext
 pkgutil --payload-files dist/Raphaeli-e027e5d-x86_64.pkg     # full payload tree listed
 pkgutil --check-signature dist/Raphaeli-e027e5d-x86_64.pkg   # "no signature" (expected)
 installer -pkg dist/... -target / -volinfo                   # volumes: /
@@ -76,7 +76,7 @@ with a Developer ID Installer cert.
 In `scripts/package.sh`, next to the existing zip line:
 
 ```bash
-./scripts/make-pkg.sh "$STAGE" --with-kext   # leaves "$STAGE/Raphaeli-$VERSION-$ARCH.pkg" beside the zip
+./scripts/make-pkg.sh "$STAGE" --target sequoia --with-kext   # leaves "$STAGE/Raphaeli-$VERSION-$ARCH.pkg" beside the zip
 ```
 
 ## Residual risks

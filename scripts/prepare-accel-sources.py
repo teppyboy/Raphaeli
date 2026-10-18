@@ -18,6 +18,11 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_ROOT = os.path.join(ROOT, "Raphaeli", "Kernel", "Accel", "upstream")
+APPROVED_METADATA = {
+    "repository": "https://github.com/nullmoth/nvidia-macos-driver.git",
+    "commit": "637282334617d27bccf8aa2448497c0f19465dc8",
+    "source_path": "kexts/NVRM/accel",
+}
 
 RENAME = (
     ("NVResource", "RaphaeliResource"),
@@ -63,9 +68,12 @@ def lock_entries():
 
 def verify_source():
     metadata, entries = lock_entries()
-    for key in ("repository", "commit", "tahoe_forwarding_provenance", "target_audit", "tahoe_target_validated"):
+    for key in ("repository", "commit", "source_path", "tahoe_forwarding_provenance", "target_audit", "tahoe_target_validated"):
         if not metadata.get(key):
             raise ValueError("SOURCE.lock missing %s" % key)
+    for key, expected in APPROVED_METADATA.items():
+        if metadata[key] != expected:
+            raise ValueError("SOURCE.lock %s is not approved" % key)
     for rel, expected in sorted(entries.items()):
         path = os.path.join(SOURCE_ROOT, rel)
         if not os.path.isfile(path):

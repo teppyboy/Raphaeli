@@ -52,6 +52,7 @@ done
 }
 case "$TARGET_SELECTOR" in
   sequoia)
+    "$R/scripts/target-preflight.sh" sequoia "$R/Raphaeli/Kernel/Accel/upstream/SOURCE.lock" || exit 1
     TARGET_NAMES="Sequoia"
     INSTALL_TARGET="the Sequoia target bundle"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15)'
@@ -59,6 +60,7 @@ case "$TARGET_SELECTOR" in
     INSTALL_DIRECT_KEXT='target/Sequoia/Raphaeli.kext'
     ;;
   tahoe)
+    "$R/scripts/target-preflight.sh" tahoe "$R/Raphaeli/Kernel/Accel/upstream/SOURCE.lock" || exit 1
     TARGET_NAMES="Tahoe"
     INSTALL_TARGET="the Tahoe target bundle"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
@@ -66,6 +68,8 @@ case "$TARGET_SELECTOR" in
     INSTALL_DIRECT_KEXT='target/Tahoe/Raphaeli.kext'
     ;;
   all)
+    "$R/scripts/target-preflight.sh" sequoia "$R/Raphaeli/Kernel/Accel/upstream/SOURCE.lock" || exit 1
+    "$R/scripts/target-preflight.sh" tahoe "$R/Raphaeli/Kernel/Accel/upstream/SOURCE.lock" || exit 1
     TARGET_NAMES="Sequoia Tahoe"
     INSTALL_TARGET="both target bundles"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15) or `python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
@@ -126,7 +130,8 @@ done
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
-cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-stage-graphics.py scripts/oc-install.py scripts/oc-install.sh "$STAGE/tools/"
+cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-stage-graphics.py scripts/oc-install.py scripts/oc-install.sh scripts/target-preflight.sh "$STAGE/tools/"
+cp Raphaeli/Kernel/Accel/upstream/SOURCE.lock "$STAGE/tools/"
 cp Raphaeli/Firmware/stage.sh Raphaeli/Firmware/README.md "$STAGE/tools/fw/"
 cp README.md "$STAGE/"
 

@@ -60,13 +60,13 @@ the next boot if a previous attach never returned; `-amdgpuoff` parks per-boot.
 
 ## Linux path (no macOS available)
 
-    python3 oc-install.py /media/user/EFI --add
+    python3 oc-install.py /media/user/EFI --add --target sequoia --system-root /mnt/target
     oc-install.sh /media/user/EFI --status --system-root /mnt/target
 
 Mounting: `lsblk -pno NAME,FSTYPE,PARTLABEL,MOUNTPOINT` finds the vfat EFI
 partition; if unmounted, `udisksctl mount -b /dev/sdXN` is used; if udisksctl
 is absent the tool exits with the exact manual command to run
-(`sudo mount /dev/sdXN /mnt/efi && python3 oc-install.py /mnt/efi --add`).
+(`sudo mount /dev/sdXN /mnt/efi && python3 oc-install.py /mnt/efi --add --target sequoia --system-root /mnt/target`).
 
 ## Validation
 

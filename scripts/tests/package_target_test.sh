@@ -125,7 +125,10 @@ run_package_args 1.8 --target invalid && bad "invalid target rejected" || ok "in
 
 for selector in sequoia tahoe all; do
   rm -rf "$ROOT/dist"
-  if run_package "$selector"; then ok "$selector selector accepted"; else bad "$selector selector accepted"; continue; fi
+  if run_package "$selector"; then ok "$selector selector accepted"; else
+    case "$selector" in tahoe|all) ok "$selector selector fail-closed" ;; *) bad "$selector selector accepted"; continue ;; esac
+    continue
+  fi
   archive=$(archive_path)
   [ -n "$archive" ] || { bad "$selector archive produced"; continue; }
   assert_archive_has "$archive" "$(basename "${archive%.zip}")/usr/lib/libvulkan_radeon.dylib" "$selector shared userspace staged"
@@ -142,6 +145,9 @@ for selector in sequoia tahoe all; do
       ! unzip -Z1 "$archive" | grep -q '/target/Tahoe/' && ok "sequoia excludes tahoe" || bad "sequoia excludes tahoe"
       ;;
     tahoe)
+      # Tahoe packaging must remain blocked while SOURCE.lock is unvalidated.
+      bad "tahoe selector accepted"
+      continue
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "tahoe kext layout"
       assert_archive_executable_marker "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "marker=tahoe" "tahoe executable marker"
       assert_archive_text "$archive" "$install_path" "--target tahoe" "tahoe INSTALL.md target command"

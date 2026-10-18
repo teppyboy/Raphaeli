@@ -11,8 +11,8 @@
 # own that) and does NOT run kmutil: auxKC rebuild (kmutil install/rebuild) must happen on
 # the booted target system, not from RecoveryOS.
 #
-# Usage: scripts/make-pkg.sh [out-dir] [--with-kext]     # default out-dir: dist
-#   KEXT source: out-disp/Raphaeli.kext (override with RAPHAELI_KEXT=<dir>, same as package.sh)
+# Usage: scripts/make-pkg.sh [out-dir] [--target sequoia|tahoe] [--with-kext]
+#   --with-kext requires --target and uses out/target/<Target>/Raphaeli.kext.
 #
 # Unsigned pkg: `installer -pkg <pkg> -target /Volumes/<vol>` accepts unsigned pkgs from CLI;
 # double-clicking an unsigned pkg in GUI triggers Gatekeeper ("unidentified developer") and
@@ -23,21 +23,33 @@ cd "$R"
 
 OUT_DIR=dist
 WITH_KEXT=0
-for arg in "$@"; do
-  case $arg in
+TARGET_SELECTOR=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
     --with-kext) WITH_KEXT=1 ;;
-    *) OUT_DIR=$arg ;;
+    --target) shift; [ "$#" -gt 0 ] || { echo "make-pkg.sh: --target requires sequoia or tahoe" >&2; exit 1; }; TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') ;;
+    --target=*) TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]') ;;
+    --*) echo "make-pkg.sh: unknown option $1" >&2; exit 1 ;;
+    *) OUT_DIR=$1 ;;
   esac
+  shift
 done
+case "$TARGET_SELECTOR" in
+  "") [ "$WITH_KEXT" = 0 ] || { echo "make-pkg.sh: --with-kext requires --target sequoia or tahoe" >&2; exit 1; } ;;
+  sequoia) TARGET_NAME=Sequoia ;;
+  tahoe) TARGET_NAME=Tahoe ;;
+  *) echo "make-pkg.sh: unsupported target '$TARGET_SELECTOR'" >&2; exit 1 ;;
+esac
 
 HASH=$(git rev-parse --short HEAD)
 PKG="$OUT_DIR/Raphaeli-$HASH-x86_64.pkg"
-KEXT=${RAPHAELI_KEXT:-out-disp/Raphaeli.kext}
+KEXT=${RAPHAELI_KEXT:-out/target/${TARGET_NAME:-Sequoia}/Raphaeli.kext}
 
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
 [ -d firmware/amdgpu ] || { echo "missing firmware/amdgpu" >&2; exit 1; }
 if [ $WITH_KEXT = 1 ]; then
-  [ -d "$KEXT" ] || { echo "missing $KEXT - run scripts/link.sh first" >&2; exit 1; }
+  "$R/scripts/target-preflight.sh" "$TARGET_SELECTOR" "$R/Raphaeli/Kernel/Accel/upstream/SOURCE.lock" || exit 1
+  [ -d "$KEXT" ] || { echo "missing $KEXT - run scripts/link.sh --target $TARGET_SELECTOR first" >&2; exit 1; }
 fi
 for tool in pkgbuild productbuild plutil install_name_tool; do
   command -v $tool >/dev/null || { echo "missing $tool" >&2; exit 1; }

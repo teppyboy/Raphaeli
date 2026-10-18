@@ -13,21 +13,8 @@
       <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
       <key>IOClass</key><string>Raphaeli</string>
       <key>IOProviderClass</key><string>IOPCIDevice</string>
-      <!-- AMD display-class functions, first target Radeon 780M (Phoenix, 0x15bf, gfx1103); the vendor-wide
-           match also covers other AMD display functions. Opt-in: raphaeli-amd=1 or the device property
-           "raphaeli-gpu"; probe() declines every device the user did not opt in, so the score only matters for
-           devices the user handed to this driver -->
-      <key>IOPCIPrimaryMatch</key><string>0x00001002&amp;0x0000ffff</string>
-      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
-      <key>IOProbeScore</key><integer>60000</integer>
-    </dict>
-    <key>RaphaeliIntel</key><dict>
-      <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
-      <key>IOClass</key><string>Raphaeli</string>
-      <key>IOProviderClass</key><string>IOPCIDevice</string>
-      <!-- Intel display-class functions (opt-in: raphaeli-intel=1 or "raphaeli-gpu"); probe() declines every one
-           the user did not opt in, so the score only matters for devices the user handed to this driver -->
-      <key>IOPCIPrimaryMatch</key><string>0x00008086&amp;0x0000ffff</string>
+      <!-- Only the validated Radeon 780M / Phoenix PCI ID is eligible. -->
+      <key>IOPCIPrimaryMatch</key><string>0x000015bf&amp;0xffffffff</string>
       <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
       <key>IOProbeScore</key><integer>60000</integer>
     </dict>
@@ -45,25 +32,13 @@
       <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
       <key>IOProbeScore</key><integer>1000</integer>
     </dict>
-    <!-- RaphaeliAccel: IOAcceleratorFamily2 nub. Matches every AMD/Intel display-class function, but start()
-         declines unless the provider carries "nmxgpu-claimed" (set by the Raphaeli service after a successful
-         attach), so it is inert on hosts where the main service never claimed the GPU. The IOMatchCategory is what
-         allows Raphaeli and RaphaeliAccel on the same PCI function. No IOUserClientClass keys: the family's
-         IOGraphicsAccelerator2::newUserClient creates every standard client type itself -->
+    <!-- RaphaeliAccel: IOAcceleratorFamily2 nub for the validated Phoenix device only. The IOMatchCategory
+         allows Raphaeli and RaphaeliAccel on the same PCI function. -->
     <key>RaphaeliAccel</key><dict>
       <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
       <key>IOClass</key><string>RaphaeliAccel</string>
       <key>IOProviderClass</key><string>IOPCIDevice</string>
-      <key>IOPCIPrimaryMatch</key><string>0x00001002&amp;0x0000ffff</string>
-      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
-      <key>IOMatchCategory</key><string>IOAccelerator</string>
-      <key>IOProbeScore</key><integer>100</integer>
-    </dict>
-    <key>RaphaeliAccelIntel</key><dict>
-      <key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
-      <key>IOClass</key><string>RaphaeliAccel</string>
-      <key>IOProviderClass</key><string>IOPCIDevice</string>
-      <key>IOPCIPrimaryMatch</key><string>0x00008086&amp;0x0000ffff</string>
+      <key>IOPCIPrimaryMatch</key><string>0x000015bf&amp;0xffffffff</string>
       <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
       <key>IOMatchCategory</key><string>IOAccelerator</string>
       <key>IOProbeScore</key><integer>100</integer>
