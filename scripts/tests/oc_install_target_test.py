@@ -33,7 +33,10 @@ class TargetResolutionTest(unittest.TestCase):
 
     def _make_kext(self, path, selected_target=None):
         (path / "Contents" / "MacOS").mkdir(parents=True)
-        metadata = {"CFBundleExecutable": "Raphaeli"}
+        metadata = {
+            "CFBundleExecutable": "Raphaeli",
+            "CFBundleName": "Raphaeli",
+        }
         if selected_target is not None:
             metadata["SelectedTarget"] = selected_target
         (path / "Contents" / "Info.plist").write_bytes(plistlib.dumps(metadata))
@@ -67,6 +70,13 @@ class TargetResolutionTest(unittest.TestCase):
         shutil.copy2(ROOT / "Raphaeli" / "Firmware" / "stage.sh", firmware_stage)
         return subprocess.run(
             [sys.executable, str(package_script), str(self.efi), "--add", *args],
+            capture_output=True,
+            text=True,
+        )
+
+    def _run_action(self, action, *args):
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), str(self.efi), action, *args],
             capture_output=True,
             text=True,
         )
@@ -118,6 +128,7 @@ class TargetResolutionTest(unittest.TestCase):
             (self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
         )
         self.assertEqual(staged_info["SelectedTarget"], "Tahoe")
+        self.assertEqual(staged_info["CFBundleName"], "Raphaeli")
 
     def test_existing_entry_always_refreshes_selected_bounds(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
@@ -127,11 +138,13 @@ class TargetResolutionTest(unittest.TestCase):
             "Enabled": True,
             "MinKernel": "23.4.0",
             "MaxKernel": "23.99.99",
+            "CustomField": "preserve-me",
         }]}}))
         result = self._run_add("--target", "tahoe", "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"))
         self.assertEqual(result.returncode, 0, result.stderr)
         entry = plistlib.loads(config.read_bytes())["Kernel"]["Add"][0]
         self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
+        self.assertEqual(entry["CustomField"], "preserve-me")
 
     def test_kext_override_requires_known_target_and_uses_override(self):
         override = self.root / "override" / "Raphaeli.kext"
@@ -139,6 +152,45 @@ class TargetResolutionTest(unittest.TestCase):
         result = self._run_add("--target", "sequoia", "--kext-src", str(override))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext").is_dir())
+
+    def test_status_reports_selected_target_and_bounds(self):
+        result = self._run_add(
+            "--target", "tahoe",
+            "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self._run_action("--status", "--target", "tahoe")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("target:            Tahoe", result.stdout)
+        self.assertIn("MinKernel=25.0.0, MaxKernel=25.99.99", result.stdout)
+
+    def test_status_infers_target_from_existing_entry_bounds(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext",
+            "Enabled": True,
+            "MinKernel": "24.0.0",
+            "MaxKernel": "24.99.99",
+        }]}}))
+        result = self._run_action("--status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("target:            Sequoia", result.stdout)
+
+    def test_remove_deletes_only_staged_raphaeli_bundle(self):
+        staged = self.efi / "EFI" / "OC" / "Kexts"
+        self._make_kext(staged / "Raphaeli.kext")
+        self._make_kext(staged / "Other.kext")
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [
+            {"BundlePath": "Raphaeli.kext", "Enabled": True},
+            {"BundlePath": "Other.kext", "Enabled": True},
+        ]}}))
+        result = self._run_action("--remove")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((staged / "Raphaeli.kext").exists())
+        self.assertTrue((staged / "Other.kext").is_dir())
+        entries = plistlib.loads(config.read_bytes())["Kernel"]["Add"]
+        self.assertEqual([entry["BundlePath"] for entry in entries], ["Other.kext"])
 
 
 if __name__ == "__main__":

@@ -514,11 +514,40 @@ def action_remove() -> None:
         validate_config()
 
 
+def status_target(cfg: "dict") -> "tuple[str, str, str]":
+    """Return the selected target name and bounds without mutating the EFI."""
+    package_root = os.path.dirname(SCRIPT_DIR)
+    if TARGET_SELECTOR or SYSTEM_ROOT_SET:
+        selected = resolve_target(
+            TARGET_SELECTOR,
+            SYS_ROOT if SYSTEM_ROOT_SET else "",
+            package_root,
+        )
+        return selected.name, selected.min_kernel, selected.max_kernel
+
+    idx = find_entry_index(cfg)
+    if idx is not None:
+        entry = cfg["Kernel"]["Add"][idx]
+        minimum = entry.get("MinKernel", "")
+        maximum = entry.get("MaxKernel", "")
+        for name, target_min, target_max in TARGETS.values():
+            if minimum == target_min and maximum == target_max:
+                return name, target_min, target_max
+        if isinstance(minimum, str) and isinstance(maximum, str):
+            return "unknown", minimum, maximum
+    return "unknown", "", ""
+
 def action_status() -> None:
     cfg = load_config()
     idx = find_entry_index(cfg)
+    target_name, min_kernel, max_kernel = status_target(cfg)
     print(f"EFI volume:        {VOL}")
     print(f"config.plist:      {CONFIG}")
+    print(f"target:            {target_name}")
+    if min_kernel or max_kernel:
+        print(f"kernel bounds:     MinKernel={min_kernel}, MaxKernel={max_kernel}")
+    else:
+        print("kernel bounds:     not selected")
     if idx is not None:
         enabled = cfg["Kernel"]["Add"][idx].get("Enabled")
         print(f"config entry:      present at Kernel>Add:{idx}, Enabled={str(enabled).lower()}")
