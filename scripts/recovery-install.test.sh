@@ -120,6 +120,12 @@ t "Sequoia target resolves package bundle" 0 run_inst "$V1" --target sequoia --d
 assert_out "Sequoia bundle selected" "$DIST/target/Sequoia/Raphaeli.kext"
 t "Tahoe target resolves package bundle" 0 run_inst "$V1" --target=tahoe --dry-run
 assert_out "Tahoe bundle selected" "$DIST/target/Tahoe/Raphaeli.kext"
+# The packaged script must not silently fall back to the repository firmware census.
+# Remove the package copy while keeping the source-tree copy available.
+mv "$DIST/tools/fw/stage.sh" "$WORK/stage.sh.missing"
+t "packaged stage.sh is required" 1 run_inst "$V1" --target sequoia --dry-run
+assert_out "missing packaged stage path reported" "$DIST/tools/fw/stage.sh"
+mv "$WORK/stage.sh.missing" "$DIST/tools/fw/stage.sh"
 KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
 run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
 t "explicit kext override wins" 0 run_override "$V1" --target tahoe --dry-run
@@ -160,7 +166,8 @@ assert_out "prints ICD json path"         "$V1/usr/local/share/vulkan/icd.d/rade
 assert_out "prints absolute library_path" "library_path=/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
 assert_out "prints kext ditto"            "ditto *dist/target/Sequoia/Raphaeli.kext"
 assert_out "prints chown root:wheel"      "chown -R root:wheel"
-assert_out "prints firmware staging"      "stage.sh"
+assert_out "prints packaged firmware staging" "$DIST/tools/fw/stage.sh"
+assert_out "prints packaged stage destination" "$V1/Library/Raphaeli/firmware"
 assert_out "prints mount -uw"             "mount -uw $V1"
 assert_out "no boot-args without --apply" "not applying boot-args"
 if [[ $out != *"nvram boot-args="* ]]; then

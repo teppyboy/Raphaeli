@@ -36,6 +36,8 @@ header.
 
 - `bash -n` on changed shell wrappers and tests: passed.
 - `python3 -m py_compile scripts/oc-install.py`: passed.
-- `scripts/tests/mac_kernel_sdk_test.sh`: passed.
-- `scripts/oc-install.test.sh`: passed.
-- `scripts/recovery-install.test.sh`: passed (71 checks).
+- `scripts/tests/mac_kernel_sdk_test.sh`: passed; all six compiler wrappers plus `kext-build.sh` and `link.sh` are checked for selected SDK include/library use, and all Sequoia accelerator headers are present.
+- `scripts/oc-install.test.sh`: passed, including explicit `--kext-src` rejection without `--target`/`--system-root`.
+- `scripts/recovery-install.test.sh`: passed (74 checks), including packaged `tools/fw/stage.sh` resolution/failure and target bundle selection.
+- `./scripts/build.sh --target sequoia`: passed (900/900).
+- `./scripts/rt.sh --target sequoia`: blocked by four pre-existing runtime compile errors (`strnstr` declaration and missing `ACCELLOG`), unrelated to packaging/SDK selection.

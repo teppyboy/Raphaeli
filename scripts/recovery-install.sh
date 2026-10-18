@@ -33,7 +33,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # dist zip layout: tools/recovery-install.sh next to target/, usr/lib/, firmware/
 # dev tree fallback: out/target/<OS>/Raphaeli.kext + out/usr/lib + firmware/amdgpu
 SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-if [[ -f $SCRIPT_DIR/fw/stage.sh && -d $SRC_ROOT/target ]]; then
+if [[ -d $SRC_ROOT/target ]]; then
+  # Presence of target/ identifies a package even when a required tools/fw
+  # input is missing; do not silently fall back to the checkout's stage.sh.
   PACKAGED=1
   FW_STAGE_SH=$SCRIPT_DIR/fw/stage.sh
 else
