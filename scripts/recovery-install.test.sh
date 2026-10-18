@@ -130,6 +130,10 @@ assert_out "missing packaged stage path reported" "$DIST/tools/fw/stage.sh"
 mv "$WORK/stage.sh.missing" "$DIST/tools/fw/stage.sh"
 KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
 run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
+t "packaged override without target is rejected" 1 env PATH="$SHIM:$PATH" RAPHAELI_KEXT="$KEXT_OVERRIDE" \
+                                        RAPHAELI_VOLUMES_DIR="$VOLDIR" \
+                                        "$DIST/tools/recovery-install.sh" "$V1" --dry-run
+assert_out "packaged override still requires target" "packaged installs require --target sequoia or --target tahoe"
 t "Tahoe override remains fail-closed" 1 run_override "$V1" --target tahoe --dry-run
 assert_out "override validation gate reported" "tahoe_target_validated=no"
 # An override changes only the bundle source; target preflight still runs.

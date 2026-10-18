@@ -245,7 +245,10 @@ while (($#)); do
 done
 
 # Resolve the selected bundle after parsing so --target may appear anywhere.
-# RAPHAELI_KEXT changes only the source; target validation still always runs.
+# RAPHAELI_KEXT changes only the source; packaged installs still require a target.
+if [[ $PACKAGED -eq 1 && -z $TARGET_SELECTOR ]]; then
+  die "packaged installs require --target sequoia or --target tahoe"
+fi
 if [[ -n $TARGET_SELECTOR ]]; then
   PREFLIGHT=$SRC_ROOT/tools/target-preflight.sh
   [[ -x $PREFLIGHT ]] || PREFLIGHT=$SRC_ROOT/scripts/target-preflight.sh
