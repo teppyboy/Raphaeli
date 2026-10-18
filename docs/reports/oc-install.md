@@ -79,6 +79,31 @@ missing-Add-array creation, bad target rejection, and a direct python-core
 smoke cycle (add/enable/remove without the shell wrapper). Result: ALL TESTS
 PASSED. `python3 -m py_compile oc-install.py` clean.
 
+## Task 2 fix round 2
+
+Existing-entry refresh is transactional. `--add` now prepares and stamps a sibling
+staging bundle, validates firmware staging, then updates `config.plist` and swaps
+the staged bundle. Existing staged bundles remain in a temporary rollback path
+until config commit succeeds; config bytes and the old bundle are restored on
+commit failure. Existing-entry refresh does not create a new backup, preserving
+prior backup semantics; new entries still create the original-config backup.
+
+Regression coverage simulates a copy failure while an existing entry and staged
+bundle are present, asserting both remain byte-for-byte unchanged and no staging
+residue remains.
+
+Validation:
+
+```sh
+python3 -m unittest scripts/tests/oc_install_target_test.py
+bash scripts/oc-install.test.sh
+python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test.py
+git diff --check
+```
+
+Results: 12 target tests passed; OpenCore shell integration passed; compile and
+whitespace checks passed.
+
 ## Files
 
 - `xkpi/oc-install.py` (new, portable core)

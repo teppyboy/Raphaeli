@@ -150,6 +150,45 @@ class TargetResolutionTest(unittest.TestCase):
         self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
         self.assertEqual(entry["CustomField"], "preserve-me")
 
+    def test_existing_entry_copy_failure_preserves_config_and_staged_bundle(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext", "Comment": "old", "Enabled": True,
+            "MinKernel": "23.4.0", "MaxKernel": "23.99.99",
+        }]}}))
+        staged = self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext"
+        self._make_kext(staged, selected_target="Sequoia")
+        config_before = config.read_bytes()
+        staged_before = {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()}
+        old_copy_kext = oc_install.copy_kext
+        old_values = (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+                      oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+                      oc_install.SYSTEM_ROOT_SET, oc_install.DRY_RUN)
+        try:
+            oc_install.CONFIG = str(config)
+            oc_install.KEXTS_DIR = str(staged.parent)
+            oc_install.KEXT_SRC = str(self.package / "target" / "Tahoe" / "Raphaeli.kext")
+            oc_install.KEXT_SRC_EXPLICIT = True
+            oc_install.TARGET_SELECTOR = "tahoe"
+            oc_install.SYSTEM_ROOT_SET = False
+            oc_install.DRY_RUN = False
+            def fail_copy(_source, _destination):
+                raise OSError("simulated staging failure")
+            oc_install.copy_kext = fail_copy
+            with self.assertRaises(OSError):
+                oc_install.action_add()
+        finally:
+            oc_install.copy_kext = old_copy_kext
+            (oc_install.CONFIG, oc_install.KEXTS_DIR, oc_install.KEXT_SRC,
+             oc_install.KEXT_SRC_EXPLICIT, oc_install.TARGET_SELECTOR,
+             oc_install.SYSTEM_ROOT_SET, oc_install.DRY_RUN) = old_values
+        self.assertEqual(config.read_bytes(), config_before)
+        self.assertEqual(
+            {p.relative_to(staged): p.read_bytes() for p in staged.rglob("*") if p.is_file()},
+            staged_before,
+        )
+        self.assertFalse((staged.parent / "Raphaeli.kext.raphaeli-staging").exists())
+
     def test_duplicate_entries_keep_first_and_remove_only_raphaeli(self):
         config = self.efi / "EFI" / "OC" / "config.plist"
         config.write_bytes(plistlib.dumps({"Kernel": {"Add": [

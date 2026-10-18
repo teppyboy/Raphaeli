@@ -420,6 +420,68 @@ def stamp_target_metadata(bundle: str, target: TargetInfo) -> None:
         die(f"cannot stamp staged kext metadata {info_path}: {e}")
 
 
+def remove_path(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    else:
+        os.unlink(path)
+
+def prepare_staged_kext(source: str, staged: str, target: TargetInfo) -> str:
+    """Build a sibling bundle before changing config.plist or staged output."""
+    temporary = staged + ".raphaeli-staging"
+    try:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        copy_kext(source, temporary)
+        stamp_target_metadata(temporary, target)
+    except BaseException:
+        try:
+            if os.path.exists(temporary):
+                remove_path(temporary)
+        except OSError:
+            pass
+        raise
+    return temporary
+
+def commit_staged_kext(temporary: str, staged: str) -> str:
+    """Replace staged bundle, retaining the old copy until config commit."""
+    old = staged + ".raphaeli-old"
+    moved_old = False
+    try:
+        if os.path.exists(old):
+            remove_path(old)
+        if os.path.exists(staged):
+            os.replace(staged, old)
+            moved_old = True
+        os.replace(temporary, staged)
+    except OSError:
+        try:
+            if os.path.exists(temporary):
+                remove_path(temporary)
+            if moved_old and not os.path.exists(staged):
+                os.replace(old, staged)
+        except OSError:
+            pass
+        raise
+    return old if moved_old else ""
+
+def finish_staged_kext(old: str) -> None:
+    if old and os.path.exists(old):
+        remove_path(old)
+
+def restore_config_bytes(original: bytes) -> None:
+    tmp = CONFIG + ".raphaeli-rollback"
+    try:
+        with open(tmp, "wb") as stream:
+            stream.write(original)
+        os.replace(tmp, CONFIG)
+    except OSError as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        die(f"cannot roll back {CONFIG}: {e}")
+
 def action_add() -> None:
     package_root = os.path.dirname(SCRIPT_DIR)
     if KEXT_SRC_EXPLICIT and not TARGET_SELECTOR and not SYSTEM_ROOT_SET:
@@ -434,13 +496,43 @@ def action_add() -> None:
     cfg = load_config()
     indices = find_entry_indices(cfg)
     idx = indices[0] if indices else None
+    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
+    if DRY_RUN:
+        if idx is not None:
+            log(f"config entry already present at Kernel>Add:{idx}")
+            entry = cfg["Kernel"]["Add"][idx]
+            if entry.get("Enabled") is not True:
+                die(f"existing entry has Enabled={entry.get('Enabled')}; fix config.plist manually")
+            print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
+        else:
+            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+            backup = f"{CONFIG}.raphaeli-backup-{ts}"
+            print("DRY-RUN: cp", CONFIG, backup)
+            print(f"DRY-RUN: append Raphaeli.kext to :Kernel:Add")
+        copy_kext(source, staged)
+        stage_firmware()
+        return
+
+    # Stage and stamp completely before touching config.plist. A failed copy or
+    # metadata write must leave an existing entry and bundle byte-for-byte intact.
+    with open(CONFIG, "rb") as stream:
+        original_config = stream.read()
+    temporary = prepare_staged_kext(source, staged, target)
+    try:
+        stage_firmware()
+    except BaseException:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        raise
+
+    changed = False
     if idx is not None:
         log(f"config entry already present at Kernel>Add:{idx}")
         entry = cfg["Kernel"]["Add"][idx]
         enabled = entry.get("Enabled")
         if enabled is not True:
+            remove_path(temporary)
             die(f"existing entry has Enabled={enabled}; fix config.plist manually")
-        changed = False
         if entry.get("Comment") != KEXT_NAME:
             log(f"refreshing Comment -> {KEXT_NAME!r}")
             entry["Comment"] = KEXT_NAME
@@ -454,49 +546,52 @@ def action_add() -> None:
             for duplicate in reversed(indices[1:]):
                 cfg["Kernel"]["Add"].pop(duplicate)
             changed = True
-        if changed:
-            if DRY_RUN:
-                print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
-            else:
-                save_config(cfg)
     else:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = f"{CONFIG}.raphaeli-backup-{ts}"
-        log(f"backing up config.plist -> {os.path.basename(backup)}")
-        if DRY_RUN:
-            print("DRY-RUN: cp", CONFIG, backup)
-        else:
-            shutil.copy2(CONFIG, backup)
         kernel = cfg.setdefault("Kernel", {})
         add = kernel.get("Add")
         if not isinstance(add, list):
             if add is not None:
+                remove_path(temporary)
                 die(":Kernel:Add exists but is not an array")
             log("creating missing Kernel>Add array")
             add = kernel["Add"] = []
         entry = {
-            "Arch": "x86_64",
-            "BundlePath": KEXT_NAME,
-            "Comment": KEXT_NAME,
-            "Enabled": True,
-            "ExecutablePath": "Contents/MacOS/Raphaeli",
-            "MaxKernel": target.max_kernel,
-            "MinKernel": target.min_kernel,
+            "Arch": "x86_64", "BundlePath": KEXT_NAME, "Comment": KEXT_NAME,
+            "Enabled": True, "ExecutablePath": "Contents/MacOS/Raphaeli",
+            "MaxKernel": target.max_kernel, "MinKernel": target.min_kernel,
             "PlistPath": "Contents/Info.plist",
         }
         log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
-        if DRY_RUN:
-            print(f"DRY-RUN: append {entry} to :Kernel:Add")
-        else:
-            add.append(entry)
+        add.append(entry)
+        changed = True
+
+    if changed and idx is None:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup = f"{CONFIG}.raphaeli-backup-{ts}"
+        log(f"backing up config.plist -> {os.path.basename(backup)}")
+        try:
+            shutil.copy2(CONFIG, backup)
+        except OSError as e:
+            remove_path(temporary)
+            die(f"cannot back up {CONFIG}: {e}")
+
+    old = ""
+    committed = False
+    try:
+        old = commit_staged_kext(temporary, staged)
+        committed = True
+        if changed:
             save_config(cfg)
-    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
-    copy_kext(source, staged)
-    if not DRY_RUN:
-        stamp_target_metadata(staged, target)
-    stage_firmware()
-    if not DRY_RUN:
-        validate_config()
+        finish_staged_kext(old)
+    except BaseException:
+        restore_config_bytes(original_config)
+        if committed:
+            if os.path.exists(staged):
+                remove_path(staged)
+            if old and os.path.exists(old):
+                os.replace(old, staged)
+        raise
+    validate_config()
 
 
 def action_enable() -> None:
