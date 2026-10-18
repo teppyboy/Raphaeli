@@ -71,6 +71,14 @@ run_package() {
   local selector=$1
   (cd "$ROOT" && PATH="$TMP/bin:$PATH" ./scripts/package.sh --target "$selector" >/dev/null)
 }
+run_package_args() {
+  (cd "$ROOT" && PATH="$TMP/bin:$PATH" ./scripts/package.sh "$@" >/dev/null)
+}
+assert_package_fails() {
+  local name=${!#}
+  set -- "${@:1:$(($# - 1))}"
+  if run_package_args "$@"; then bad "$name"; else ok "$name"; fi
+}
 archive_path() {
   find "$ROOT/dist" -name '*.zip' -type f -print -quit
 }
@@ -79,6 +87,29 @@ assert_archive_has() {
   listing=$(unzip -Z1 "$archive")
   printf '%s\n' "$listing" | grep -Fxq "$expected" && ok "$3" || { bad "$3"; printf '%s\n' "$listing"; }
 }
+assert_archive_text() {
+  local archive=$1 path=$2 expected=$3 text
+  text=$(unzip -p "$archive" "$path")
+  printf '%s\n' "$text" | grep -Fq -- "$expected" && ok "$4" || { bad "$4"; printf '%s\n' "$text"; }
+}
+assert_archive_lacks_text() {
+  local archive=$1 path=$2 unexpected=$3 text
+  text=$(unzip -p "$archive" "$path")
+  printf '%s\n' "$text" | grep -Fq -- "$unexpected" && bad "$4" || ok "$4"
+}
+
+# Release packaging is target-aware: parser accepts version + both target spellings,
+# normalizes case, rejects duplicate/invalid selectors, and requires --target.
+grep -Fq -- 'target is required for release packaging' "$ROOT/scripts/package.sh" && ok "source target requirement marker" || bad "source target requirement marker"
+grep -Fq -- 'INSTALL_TARGET' "$ROOT/scripts/package.sh" && ok "source layout marker" || bad "source layout marker"
+grep -Fq -- 'INSTALL.md' "$ROOT/scripts/package.sh" && ok "source install marker" || bad "source install marker"
+run_package_args 1.2 --target sequoia && ok "version + target accepted" || bad "version + target accepted"
+run_package_args 1.3 --target=SEQUOIA && ok "equals target case normalized" || bad "equals target case normalized"
+run_package_args 1.4 --target && bad "missing target value rejected" || ok "missing target value rejected"
+run_package_args 1.5 --target= && bad "empty equals target rejected" || ok "empty equals target rejected"
+run_package_args 1.6 && bad "missing target rejected" || ok "missing target rejected"
+run_package_args 1.7 --target sequoia --target tahoe && bad "duplicate target rejected" || ok "duplicate target rejected"
+run_package_args 1.8 --target invalid && bad "invalid target rejected" || ok "invalid target rejected"
 
 for selector in sequoia tahoe all; do
   rm -rf "$ROOT/dist"
@@ -87,21 +118,49 @@ for selector in sequoia tahoe all; do
   [ -n "$archive" ] || { bad "$selector archive produced"; continue; }
   assert_archive_has "$archive" "$(basename "${archive%.zip}")/usr/lib/libvulkan_radeon.dylib" "$selector shared userspace staged"
   assert_archive_has "$archive" "$(basename "${archive%.zip}")/firmware/amdgpu/test.bin" "$selector shared firmware staged"
+  install_path="$(basename "${archive%.zip}")/INSTALL.md"
+  assert_archive_has "$archive" "$install_path" "$selector INSTALL.md staged"
   case "$selector" in
     sequoia)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "sequoia kext layout"
+      assert_archive_text "$archive" "$install_path" "--target sequoia" "sequoia INSTALL.md target command"
+      assert_archive_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "sequoia INSTALL.md direct path"
+      assert_archive_lacks_text "$archive" "$install_path" "target/Tahoe/Raphaeli.kext" "sequoia INSTALL.md excludes tahoe path"
       ! unzip -Z1 "$archive" | grep -q '/target/Tahoe/' && ok "sequoia excludes tahoe" || bad "sequoia excludes tahoe"
       ;;
     tahoe)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "tahoe kext layout"
+      assert_archive_text "$archive" "$install_path" "--target tahoe" "tahoe INSTALL.md target command"
+      assert_archive_text "$archive" "$install_path" "target/Tahoe/Raphaeli.kext" "tahoe INSTALL.md direct path"
+      assert_archive_lacks_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "tahoe INSTALL.md excludes sequoia path"
       ! unzip -Z1 "$archive" | grep -q '/target/Sequoia/' && ok "tahoe excludes sequoia" || bad "tahoe excludes sequoia"
       ;;
     all)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "all sequoia kext layout"
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "all tahoe kext layout"
+      assert_archive_text "$archive" "$install_path" "--target sequoia" "all INSTALL.md sequoia command"
+      assert_archive_text "$archive" "$install_path" "--target tahoe" "all INSTALL.md tahoe command"
+      assert_archive_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "all INSTALL.md sequoia direct path"
+      assert_archive_text "$archive" "$install_path" "target/Tahoe/Raphaeli.kext" "all INSTALL.md tahoe direct path"
       ;;
   esac
 done
+
+# Every required input failure must be explicit, including each target bundle and
+# shared userspace/firmware inputs.
+for missing_target in Sequoia Tahoe; do
+  mv "$ROOT/out/target/$missing_target" "$TMP/$missing_target.missing"
+  assert_package_fails --target all "missing $missing_target input rejected"
+  mv "$TMP/$missing_target.missing" "$ROOT/out/target/$missing_target"
+done
+mv "$ROOT/out/usr/lib" "$TMP/lib.missing"
+assert_package_fails --target sequoia "missing userspace input rejected"
+mkdir -p "$ROOT/out"
+mv "$TMP/lib.missing" "$ROOT/out/usr/lib"
+mv "$ROOT/firmware/amdgpu" "$TMP/fw.missing"
+assert_package_fails --target sequoia "missing firmware input rejected"
+mkdir -p "$ROOT/firmware"
+mv "$TMP/fw.missing" "$ROOT/firmware/amdgpu"
 
 echo "passed=$((fail == 0 ? 1 : 0)) failed=$fail"
 exit "$fail"

@@ -46,40 +46,48 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+[ -n "$TARGET_SELECTOR" ] || {
+  echo "package.sh: --target is required for release packaging (sequoia, tahoe, or all)" >&2
+  exit 1
+}
+case "$TARGET_SELECTOR" in
+  sequoia)
+    TARGET_NAMES="Sequoia"
+    INSTALL_TARGET="the Sequoia target bundle"
+    INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15)'
+    INSTALL_DIRECT_KEXT='target/Sequoia/Raphaeli.kext'
+    ;;
+  tahoe)
+    TARGET_NAMES="Tahoe"
+    INSTALL_TARGET="the Tahoe target bundle"
+    INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
+    INSTALL_DIRECT_KEXT='target/Tahoe/Raphaeli.kext'
+    ;;
+  all)
+    TARGET_NAMES="Sequoia Tahoe"
+    INSTALL_TARGET="both target bundles"
+    INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15) or `python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
+    INSTALL_DIRECT_KEXT='target/Sequoia/Raphaeli.kext or target/Tahoe/Raphaeli.kext'
+    ;;
+esac
 ARCH=x86_64
 NAME="Raphaeli-$VERSION-$ARCH"
 STAGE="dist/$NAME"
 
-# Kext source dir override: RAPHAELI_KEXT=<dir> ./package.sh — needed when out/Raphaeli.kext is
-# root:wheel (post-chown for kmutil) and a fresh user-owned link lives elsewhere (e.g. out-disp).
-KEXT=${RAPHAELI_KEXT:-out/Raphaeli.kext}
-if [ -n "$TARGET_SELECTOR" ]; then
-  case "$TARGET_SELECTOR" in
-    sequoia) TARGET_NAMES="Sequoia" ;;
-    tahoe) TARGET_NAMES="Tahoe" ;;
-    all) TARGET_NAMES="Sequoia Tahoe" ;;
-  esac
-  for target_name in $TARGET_NAMES; do
-    target_kext="out/target/$target_name/Raphaeli.kext"
-    [ -f "$target_kext/Contents/Info.plist" ] || {
-      echo "$target_kext is not a kext bundle" >&2
-      exit 1
-    }
-  done
-else
-  [ -f "$KEXT/Contents/Info.plist" ] || { echo "$KEXT is not a kext bundle - pass e.g. RAPHAELI_KEXT=out-disp/Raphaeli.kext" >&2; exit 1; }
-fi
+for target_name in $TARGET_NAMES; do
+  target_kext="out/target/$target_name/Raphaeli.kext"
+  [ -f "$target_kext/Contents/Info.plist" ] || {
+    echo "$target_kext is not a kext bundle" >&2
+    exit 1
+  }
+done
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
 [ -d firmware/amdgpu ] || { echo "missing firmware/amdgpu - stage firmware first" >&2; exit 1; }
 
 rm -rf "$STAGE"
-if [ -n "$TARGET_SELECTOR" ]; then
-  for target_name in $TARGET_NAMES; do
-    mkdir -p "$STAGE/target/$target_name"
-  done
-else
-  mkdir -p "$STAGE/kext"
-fi
+for target_name in $TARGET_NAMES; do
+  mkdir -p "$STAGE/target/$target_name"
+done
 mkdir -p "$STAGE"/{usr/lib,firmware/amdgpu,tools/fw}
 
 stage_kext() {
@@ -90,14 +98,10 @@ stage_kext() {
   plutil -replace CFBundleVersion -string "$HASH" "$destination/Contents/Info.plist"
   plutil -replace CFBundleShortVersionString -string "$HASH" "$destination/Contents/Info.plist"
 }
-if [ -n "$TARGET_SELECTOR" ]; then
-  for target_name in $TARGET_NAMES; do
-    target_kext="out/target/$target_name/Raphaeli.kext"
-    stage_kext "$target_kext" "$STAGE/target/$target_name/Raphaeli.kext"
-  done
-else
-  stage_kext "$KEXT" "$STAGE/kext/Raphaeli.kext"
-fi
+for target_name in $TARGET_NAMES; do
+  target_kext="out/target/$target_name/Raphaeli.kext"
+  stage_kext "$target_kext" "$STAGE/target/$target_name/Raphaeli.kext"
+done
 cp out/usr/lib/*.dylib out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/" 2>/dev/null || \
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
@@ -111,9 +115,8 @@ cat > "$STAGE/INSTALL.md" <<'EOF'
 Unsigned kext - requires AMFI + Secure Boot disabled (Hackintosh).
 
 ## OpenCore (recommended, black-screen-safe)
-Select the kext matching the target OS explicitly:
-1. `python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15)
-   or `python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)
+This release contains @INSTALL_TARGET@. Select the kext matching the target OS explicitly:
+1. @INSTALL_OC_STEP@
 2. `python3 tools/oc-install.py /path/to/EFI --enable` # adds raphaeli-amd=1 boot-arg
 3. Reboot. Recovery: `--disable` or set Enabled=false in config.plist.
 
@@ -135,9 +138,9 @@ Injection-tested only: target runtime is unverified. Restore the printed backup
 if boot fails; revalidate after OS/Recovery updates. Never mix Sequoia/Tahoe kexts.
 
 ## Direct (kextload route, needs matching KDK on target)
-1. `sudo ./tools/install.sh target/Sequoia/Raphaeli.kext`        # select the matching target bundle
+1. `sudo ./tools/install.sh @INSTALL_DIRECT_KEXT@`        # select the matching target bundle
 2. `sudo ./tools/install.sh --apply`                   # adds raphaeli-amd=1
-- target/Sequoia/ or target/Tahoe/ is selected explicitly; firmware blobs are shared
+- target bundle selection is explicit; firmware blobs are shared
 
 ## Userspace (Vulkan)
 - `usr/lib/libvulkan_radeon.dylib` + `usr/lib/radeon_icd.x86_64.json`
@@ -158,10 +161,15 @@ Boot into RecoveryOS, open Terminal:
 - `--apply` sets `raphaeli-amd=1` in NVRAM; `--uninstall` removes it, the
   `raphaeli-gpu-attaching` guard marker, and everything installed above
 - If no auxKC could be built (no matching KDK in Recovery), finish with
-  `sudo ./tools/install.sh target/Sequoia/Raphaeli.kext --apply` (or the Tahoe bundle)
-  from the booted system
+  `sudo ./tools/install.sh @INSTALL_DIRECT_KEXT@ --apply` from the booted system
 - Vulkan loader hint if discovery fails: `VK_DRIVER_FILES=/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json`
 EOF
+sed -i.bak \
+  -e "s|@INSTALL_TARGET@|$INSTALL_TARGET|g" \
+  -e "s|@INSTALL_OC_STEP@|$INSTALL_OC_STEP|g" \
+  -e "s|@INSTALL_DIRECT_KEXT@|$INSTALL_DIRECT_KEXT|g" \
+  "$STAGE/INSTALL.md"
+rm -f "$STAGE/INSTALL.md.bak"
 
 ( cd dist && rm -f "$NAME.zip" && zip -qr "$NAME.zip" "$NAME" )
 echo "dist/$NAME.zip:"; ls -la "dist/$NAME.zip"
