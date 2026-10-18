@@ -34,7 +34,7 @@ trap 'rm -rf "$WORK"' EXIT
 # ---- fake dist tree (mirrors the package.sh zip layout) ----------------------
 
 DIST=$WORK/dist
-mkdir -p "$DIST"/{tools/fw,usr/lib,firmware/amdgpu}
+mkdir -p "$DIST"/{tools/fw,usr/lib,firmware/amdgpu,target/Sequoia,target/Tahoe}
 cp "$HERE/recovery-install.sh" "$DIST/tools/"
 cp "$HERE/../Raphaeli/Firmware/stage.sh" "$DIST/tools/fw/"
 
@@ -46,12 +46,21 @@ plutil -insert CFBundleIdentifier -string me.tretrauit.raphaeli \
   "$KEXT/Contents/Info.plist" 2>/dev/null || {
   printf '<?xml version="1.0"?>\n<plist version="1.0"><dict>\n<key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>\n<key>CFBundleExecutable</key><string>raphaeli</string>\n</dict></plist>\n' > "$KEXT/Contents/Info.plist"
 }
-: > "$KEXT/Contents/MacOS/raphaeli"; chmod +x "$KEXT/Contents/MacOS/raphaeli"
+printf 'fixture executable\n' > "$KEXT/Contents/MacOS/raphaeli"; chmod +x "$KEXT/Contents/MacOS/raphaeli"
+cp -R "$KEXT" "$DIST/target/Sequoia/Raphaeli.kext"
+cp -R "$KEXT" "$DIST/target/Tahoe/Raphaeli.kext"
 
 : > "$DIST/usr/lib/libvulkan_radeon.dylib"
 : > "$DIST/usr/lib/libdrm.2.dylib"
-cp "$HERE/../firmware/amdgpu/"*.bin "$DIST/firmware/amdgpu/" 2>/dev/null
-: > "$DIST/firmware/amdgpu/ip_discovery.bin"   # optional blob, real sources may lack it
+: > "$DIST/usr/lib/libdrm_amdgpu.1.dylib"
+for firmware_name in \
+  gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \
+  gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin \
+  sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin \
+  vcn_4_0_2.bin dcn_3_1_4_dmcub.bin; do
+  : > "$DIST/firmware/amdgpu/$firmware_name"
+done
+: > "$DIST/firmware/amdgpu/ip_discovery.bin"   # optional blob
 
 # ---- mock nvram: state file, mimics name<TAB>value ----------------------------
 
@@ -99,6 +108,15 @@ t "ambiguous volumes fail"           1 env PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_D
 assert_out "ambiguity prints usage"  "usage: recovery-install.sh /Volumes/Macintosh"
 
 t "two candidates: explicit still ok" 0 run_inst "$V2" --dry-run
+
+t "Sequoia target resolves package bundle" 0 run_inst "$V1" --target sequoia --dry-run
+assert_out "Sequoia bundle selected" "$DIST/target/Sequoia/Raphaeli.kext"
+t "Tahoe target resolves package bundle" 0 run_inst "$V1" --target=tahoe --dry-run
+assert_out "Tahoe bundle selected" "$DIST/target/Tahoe/Raphaeli.kext"
+KEXT_OVERRIDE=$DIST/kext/Raphaeli.kext
+run_override() { RAPHAELI_KEXT=$KEXT_OVERRIDE run_inst "$@"; }
+t "explicit kext override wins" 0 run_override "$V1" --target tahoe --dry-run
+assert_out "override selected" "$KEXT_OVERRIDE"
 
 rm -rf "$V2"                          # single candidate -> auto-detected
 out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" --dry-run 2>&1)
@@ -181,6 +199,15 @@ assert_out "skips kext copy"          "skipping kext copy + auxKC"
 [[ -f $V3/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json ]] && \
   { echo "ok    ICD json in OC mode"; pass=$((pass + 1)); } || \
   { echo "FAIL  ICD json in OC mode"; fail=$((fail + 1)); }
+
+# ---- required input failures --------------------------------------------------
+
+mv "$DIST/usr/lib/libvulkan_radeon.dylib" "$WORK/libvulkan_radeon.dylib.missing"
+t "missing required userspace input aborts" 1 run_inst "$V1" --dry-run
+mv "$WORK/libvulkan_radeon.dylib.missing" "$DIST/usr/lib/libvulkan_radeon.dylib"
+mv "$DIST/firmware/amdgpu/vcn_4_0_2.bin" "$WORK/vcn_4_0_2.bin.missing"
+t "missing required firmware input aborts" 1 run_inst "$V1" --dry-run
+mv "$WORK/vcn_4_0_2.bin.missing" "$DIST/firmware/amdgpu/vcn_4_0_2.bin"
 
 # ---- checksum manifest --------------------------------------------------------
 

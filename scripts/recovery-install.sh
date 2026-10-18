@@ -19,8 +19,9 @@
 #     raphaeli-amd=1 and the raphaeli-gpu-attaching boot-guard marker
 #
 # Usage:
-#   recovery-install.sh [/Volumes/Macintosh\ HD] [--apply] [--dry-run]
+#   recovery-install.sh [/Volumes/Macintosh\ HD] [--target sequoia|tahoe] [--apply] [--dry-run]
 #   recovery-install.sh /Volumes/Macintosh\ HD --uninstall
+#   RAPHAELI_KEXT=/path/to/Raphaeli.kext recovery-install.sh /Volumes/Macintosh\ HD
 #
 # Boot guard (Raphaeli/Kernel/nmx_kext.cpp): between attach start and hand-over
 # the kext sets the NVRAM marker raphaeli-gpu-attaching; if the marker is still
@@ -38,8 +39,7 @@ else
   SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)   # repo root: out/ + firmware/
   FW_STAGE_SH=$SRC_ROOT/Raphaeli/Firmware/stage.sh
 fi
-KEXT_SRC=${RAPHAELI_KEXT:-$SRC_ROOT/kext/Raphaeli.kext}
-[[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+KEXT_SRC=${RAPHAELI_KEXT:-}
 USR_LIB_SRC=$SRC_ROOT/usr/lib
 [[ -d $USR_LIB_SRC ]] || USR_LIB_SRC=$SRC_ROOT/out/usr/lib
 FW_SRC=${RAPHAELI_FW_SRC:-$SRC_ROOT/firmware/amdgpu}
@@ -52,7 +52,6 @@ ICD_LIBRARY_PATH="/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
 
 # fw/README.md + fw/stage.sh: exactly the names amdgpu passes to request_firmware()
 REQUIRED_FW=(
-  ip_discovery.bin
   gc_11_0_1_pfp.bin
   gc_11_0_1_me.bin
   gc_11_0_1_rlc.bin
@@ -70,9 +69,10 @@ DRY_RUN=0
 APPLY=0
 UNINSTALL=0
 VOL=""
+TARGET_SELECTOR=""
 
 usage() {
-  echo "usage: recovery-install.sh /Volumes/Macintosh\\ HD [--apply] [--uninstall] [--dry-run]"
+  echo "usage: recovery-install.sh /Volumes/Macintosh\\ HD [--target sequoia|tahoe] [--apply] [--uninstall] [--dry-run]"
 }
 
 die() { echo "recovery-install.sh: $*" >&2; exit 1; }
@@ -96,6 +96,24 @@ while (($#)); do
     --dry-run) DRY_RUN=1 ;;
     --apply) APPLY=1 ;;
     --uninstall) UNINSTALL=1 ;;
+    --target)
+      shift
+      [[ $# -gt 0 ]] || die "--target requires sequoia or tahoe"
+      [[ -z $TARGET_SELECTOR ]] || die "--target specified more than once"
+      TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+      case "$TARGET_SELECTOR" in
+        sequoia|tahoe) ;;
+        *) die "unsupported target '$1' (use sequoia or tahoe)" ;;
+      esac
+      ;;
+    --target=*)
+      [[ -z $TARGET_SELECTOR ]] || die "--target specified more than once"
+      TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]')
+      case "$TARGET_SELECTOR" in
+        sequoia|tahoe) ;;
+        *) die "unsupported target '${1#--target=}' (use sequoia or tahoe)" ;;
+      esac
+      ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown option: $1"; usage >&2 ;;
     *)
@@ -105,6 +123,17 @@ while (($#)); do
   esac
   shift
 done
+
+# Resolve the selected bundle after parsing so --target may appear anywhere.
+# RAPHAELI_KEXT is an explicit override and always takes precedence.
+if [[ -z $KEXT_SRC ]]; then
+  if [[ -n $TARGET_SELECTOR ]]; then
+    KEXT_SRC=$SRC_ROOT/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
+  else
+    KEXT_SRC=$SRC_ROOT/kext/Raphaeli.kext
+    [[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+  fi
+fi
 
 # ---- volume resolution ------------------------------------------------------
 
@@ -171,8 +200,11 @@ log "dist source root: $SRC_ROOT"
 plutil -lint "$KEXT_SRC/Contents/Info.plist" >/dev/null || die "Info.plist does not lint: $KEXT_SRC"
 bundle_id=$(plutil -extract CFBundleIdentifier raw "$KEXT_SRC/Contents/Info.plist")
 [[ $bundle_id == "$KEXT_ID" ]] || die "unexpected bundle id '$bundle_id' (expected $KEXT_ID)"
-[[ -f $USR_LIB_SRC/libvulkan_radeon.dylib ]] || die "missing $USR_LIB_SRC/libvulkan_radeon.dylib (dist zip usr/lib/)"
+for userspace_file in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do
+  [[ -f $USR_LIB_SRC/$userspace_file ]] || die "missing $USR_LIB_SRC/$userspace_file (dist zip usr/lib/)"
+done
 
+log "selected kext: $KEXT_SRC${TARGET_SELECTOR:+ (target $TARGET_SELECTOR)}"
 log "firmware census in $FW_SRC (required: ${#REQUIRED_FW[@]})"
 missing=()
 for f in "${REQUIRED_FW[@]}"; do

@@ -55,18 +55,21 @@ case "$TARGET_SELECTOR" in
     TARGET_NAMES="Sequoia"
     INSTALL_TARGET="the Sequoia target bundle"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15)'
+    INSTALL_RECOVERY_STEP='`./tools/recovery-install.sh "/Volumes/Macintosh HD" --target sequoia --apply`'
     INSTALL_DIRECT_KEXT='target/Sequoia/Raphaeli.kext'
     ;;
   tahoe)
     TARGET_NAMES="Tahoe"
     INSTALL_TARGET="the Tahoe target bundle"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
+    INSTALL_RECOVERY_STEP='`./tools/recovery-install.sh "/Volumes/Macintosh HD" --target tahoe --apply`'
     INSTALL_DIRECT_KEXT='target/Tahoe/Raphaeli.kext'
     ;;
   all)
     TARGET_NAMES="Sequoia Tahoe"
     INSTALL_TARGET="both target bundles"
     INSTALL_OC_STEP='`python3 tools/oc-install.py /path/to/EFI --add --target sequoia` (macOS 15) or `python3 tools/oc-install.py /path/to/EFI --add --target tahoe` (macOS 26)'
+    INSTALL_RECOVERY_STEP='`./tools/recovery-install.sh "/Volumes/Macintosh HD" --target sequoia --apply` (macOS 15) or `./tools/recovery-install.sh "/Volumes/Macintosh HD" --target tahoe --apply` (macOS 26)'
     INSTALL_DIRECT_KEXT='target/Sequoia/Raphaeli.kext or target/Tahoe/Raphaeli.kext'
     ;;
 esac
@@ -82,7 +85,25 @@ for target_name in $TARGET_NAMES; do
   }
 done
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
+for userspace_file in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do
+  [ -f "out/usr/lib/$userspace_file" ] || {
+    echo "missing out/usr/lib/$userspace_file - build libdrm/RADV first" >&2
+    exit 1
+  }
+done
 [ -d firmware/amdgpu ] || { echo "missing firmware/amdgpu - stage firmware first" >&2; exit 1; }
+REQUIRED_FW_NAMES="
+ gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin
+ gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin
+ sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin
+ vcn_4_0_2.bin dcn_3_1_4_dmcub.bin
+"
+for firmware_name in $REQUIRED_FW_NAMES; do
+  [ -f "firmware/amdgpu/$firmware_name" ] || {
+    echo "missing firmware/amdgpu/$firmware_name - stage firmware first" >&2
+    exit 1
+  }
+done
 
 rm -rf "$STAGE"
 for target_name in $TARGET_NAMES; do
@@ -149,8 +170,9 @@ if boot fails; revalidate after OS/Recovery updates. Never mix Sequoia/Tahoe kex
 ## Installing from macOS Recovery
 For when the normal volume's WindowServer crashes and kextload is impossible.
 Boot into RecoveryOS, open Terminal:
-1. `./tools/recovery-install.sh /Volumes/Macintosh\ HD --apply`
-   (auto-detects the volume if unambiguous; add `--dry-run` to preview;
+1. @INSTALL_RECOVERY_STEP@
+   (auto-detects the volume if unambiguous; `--target sequoia|tahoe` selects
+   the matching kext; add `--dry-run` to preview;
    plain bash 3.2 + coreutils, exactly what RecoveryOS ships)
 - APFS: tries `mount -uw`; dylibs go to `Library/Raphaeli/usr/lib/` (Sealed
   System Volume makes `/usr/lib` unwritable) and the ICD json is written to
@@ -167,6 +189,7 @@ EOF
 sed -i.bak \
   -e "s|@INSTALL_TARGET@|$INSTALL_TARGET|g" \
   -e "s|@INSTALL_OC_STEP@|$INSTALL_OC_STEP|g" \
+  -e "s|@INSTALL_RECOVERY_STEP@|$INSTALL_RECOVERY_STEP|g" \
   -e "s|@INSTALL_DIRECT_KEXT@|$INSTALL_DIRECT_KEXT|g" \
   "$STAGE/INSTALL.md"
 rm -f "$STAGE/INSTALL.md.bak"

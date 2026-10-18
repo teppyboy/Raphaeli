@@ -2,7 +2,7 @@
 
 ## Scope
 
-Implemented packaging selector/layout only. `scripts/package.sh` accepts `--target sequoia`, `--target tahoe`, `--target all`. Selected bundles are staged as `target/Sequoia/Raphaeli.kext` and/or `target/Tahoe/Raphaeli.kext`; firmware and userspace remain shared at package root. Existing positional version invocation remains supported when no selector is used.
+Implemented target-specific packaging. `scripts/package.sh` accepts `--target sequoia`, `--target tahoe`, or `--target all`; release packaging requires one selector. Selected bundles are staged as `target/Sequoia/Raphaeli.kext` and/or `target/Tahoe/Raphaeli.kext`; firmware and userspace remain shared at package root. Recovery installation selects the matching package bundle via `--target`, with `RAPHAELI_KEXT` preserved as an explicit override.
 
 Generated `INSTALL.md` now documents explicit EFI target selection and `--system-root` for mounted target volumes. It does not recommend host-version detection.
 

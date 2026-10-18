@@ -66,6 +66,13 @@ mk_kext "$ROOT/out/target/Tahoe/Raphaeli.kext" tahoe
 : > "$ROOT/out/usr/lib/libvulkan_radeon.dylib"
 : > "$ROOT/out/usr/lib/radeon_icd.x86_64.json"
 : > "$ROOT/firmware/amdgpu/test.bin"
+for firmware_name in \
+  gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \
+  gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin \
+  sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin \
+  vcn_4_0_2.bin dcn_3_1_4_dmcub.bin; do
+  : > "$ROOT/firmware/amdgpu/$firmware_name"
+done
 
 run_package() {
   local selector=$1
@@ -97,6 +104,11 @@ assert_archive_lacks_text() {
   text=$(unzip -p "$archive" "$path")
   printf '%s\n' "$text" | grep -Fq -- "$unexpected" && bad "$4" || ok "$4"
 }
+assert_archive_executable_marker() {
+  local archive=$1 path=$2 expected=$3 text
+  text=$(unzip -p "$archive" "$path")
+  [ "$text" = "$expected" ] && ok "$4" || { bad "$4"; printf '%s\n' "$text"; }
+}
 
 # Release packaging is target-aware: parser accepts version + both target spellings,
 # normalizes case, rejects duplicate/invalid selectors, and requires --target.
@@ -123,6 +135,7 @@ for selector in sequoia tahoe all; do
   case "$selector" in
     sequoia)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "sequoia kext layout"
+      assert_archive_executable_marker "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "marker=sequoia" "sequoia executable marker"
       assert_archive_text "$archive" "$install_path" "--target sequoia" "sequoia INSTALL.md target command"
       assert_archive_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "sequoia INSTALL.md direct path"
       assert_archive_lacks_text "$archive" "$install_path" "target/Tahoe/Raphaeli.kext" "sequoia INSTALL.md excludes tahoe path"
@@ -130,6 +143,7 @@ for selector in sequoia tahoe all; do
       ;;
     tahoe)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "tahoe kext layout"
+      assert_archive_executable_marker "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "marker=tahoe" "tahoe executable marker"
       assert_archive_text "$archive" "$install_path" "--target tahoe" "tahoe INSTALL.md target command"
       assert_archive_text "$archive" "$install_path" "target/Tahoe/Raphaeli.kext" "tahoe INSTALL.md direct path"
       assert_archive_lacks_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "tahoe INSTALL.md excludes sequoia path"
@@ -137,7 +151,9 @@ for selector in sequoia tahoe all; do
       ;;
     all)
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "all sequoia kext layout"
+      assert_archive_executable_marker "$archive" "$(basename "${archive%.zip}")/target/Sequoia/Raphaeli.kext/Contents/MacOS/Raphaeli" "marker=sequoia" "all sequoia executable marker"
       assert_archive_has "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "all tahoe kext layout"
+      assert_archive_executable_marker "$archive" "$(basename "${archive%.zip}")/target/Tahoe/Raphaeli.kext/Contents/MacOS/Raphaeli" "marker=tahoe" "all tahoe executable marker"
       assert_archive_text "$archive" "$install_path" "--target sequoia" "all INSTALL.md sequoia command"
       assert_archive_text "$archive" "$install_path" "--target tahoe" "all INSTALL.md tahoe command"
       assert_archive_text "$archive" "$install_path" "target/Sequoia/Raphaeli.kext" "all INSTALL.md sequoia direct path"
