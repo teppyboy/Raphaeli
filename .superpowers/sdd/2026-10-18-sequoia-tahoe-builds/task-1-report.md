@@ -26,4 +26,19 @@ python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test
 git diff --check
 ```
 
-Existing dirty files outside Task 1 were not modified or staged.
+Existing dirty files outside Task 1 were not modified by this work. The commit also contains pre-existing parent-owned changes in `.gitignore`, `docs/reports/oc-vtable-reproduction.md`, `docs/reports/tahoe-recovery-exact-image.md`, `scripts/oc-stage-graphics.py`, and `scripts/tests/oc_stage_graphics_test.py`; these were already staged in the worktree and were intentionally left intact.
+
+## Round 1 fixes
+
+- Existing `Kernel>Add` entries now always refresh selected `MinKernel` and `MaxKernel`; bound updates no longer depend on a `Comment` change.
+- Added an integration fixture that runs the installer from a package-shaped tree with `--target tahoe` and no `--kext-src`, asserting the staged bundle is Tahoe.
+- Added regression coverage for refreshing bounds on an already matching entry.
+
+Commands passed:
+
+```sh
+python3 -m unittest scripts/tests/oc_install_target_test.py
+./scripts/oc-install.test.sh
+python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test.py
+ git diff --check
+```

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,17 +25,18 @@ class TargetResolutionTest(unittest.TestCase):
         self.package = self.root / "package"
         self.efi = self.root / "efi"
         self._make_efi()
-        for name in ("Sequoia", "Tahoe"):
-            self._make_kext(self.package / "target" / name / "Raphaeli.kext")
+        self._make_kext(self.package / "target" / "Sequoia" / "Raphaeli.kext", "Sequoia")
+        self._make_kext(self.package / "target" / "Tahoe" / "Raphaeli.kext", "Tahoe")
 
     def tearDown(self):
         self.tmp.cleanup()
 
-    def _make_kext(self, path):
+    def _make_kext(self, path, selected_target=None):
         (path / "Contents" / "MacOS").mkdir(parents=True)
-        (path / "Contents" / "Info.plist").write_bytes(
-            plistlib.dumps({"CFBundleExecutable": "Raphaeli"})
-        )
+        metadata = {"CFBundleExecutable": "Raphaeli"}
+        if selected_target is not None:
+            metadata["SelectedTarget"] = selected_target
+        (path / "Contents" / "Info.plist").write_bytes(plistlib.dumps(metadata))
         (path / "Contents" / "MacOS" / "Raphaeli").touch()
 
     def _make_efi(self):
@@ -52,6 +54,19 @@ class TargetResolutionTest(unittest.TestCase):
     def _run_add(self, *args):
         return subprocess.run(
             [sys.executable, str(SCRIPT), str(self.efi), "--add", *args],
+            capture_output=True,
+            text=True,
+        )
+
+    def _run_add_from_package(self, *args):
+        package_script = self.package / "scripts" / "oc-install.py"
+        package_script.parent.mkdir()
+        shutil.copy2(SCRIPT, package_script)
+        firmware_stage = self.package / "Raphaeli" / "Firmware" / "stage.sh"
+        firmware_stage.parent.mkdir(parents=True)
+        shutil.copy2(ROOT / "Raphaeli" / "Firmware" / "stage.sh", firmware_stage)
+        return subprocess.run(
+            [sys.executable, str(package_script), str(self.efi), "--add", *args],
             capture_output=True,
             text=True,
         )
@@ -95,6 +110,28 @@ class TargetResolutionTest(unittest.TestCase):
         self.assertEqual(entry["MinKernel"], "25.0.0")
         self.assertEqual(entry["MaxKernel"], "25.99.99")
         self.assertTrue((self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").is_file())
+
+    def test_add_target_selects_bundle_without_kext_override(self):
+        result = self._run_add_from_package("--target", "tahoe")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        staged_info = plistlib.loads(
+            (self.efi / "EFI" / "OC" / "Kexts" / "Raphaeli.kext" / "Contents" / "Info.plist").read_bytes()
+        )
+        self.assertEqual(staged_info["SelectedTarget"], "Tahoe")
+
+    def test_existing_entry_always_refreshes_selected_bounds(self):
+        config = self.efi / "EFI" / "OC" / "config.plist"
+        config.write_bytes(plistlib.dumps({"Kernel": {"Add": [{
+            "BundlePath": "Raphaeli.kext",
+            "Comment": "Raphaeli.kext",
+            "Enabled": True,
+            "MinKernel": "23.4.0",
+            "MaxKernel": "23.99.99",
+        }]}}))
+        result = self._run_add("--target", "tahoe", "--kext-src", str(self.package / "target" / "Tahoe" / "Raphaeli.kext"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entry = plistlib.loads(config.read_bytes())["Kernel"]["Add"][0]
+        self.assertEqual((entry["MinKernel"], entry["MaxKernel"]), ("25.0.0", "25.99.99"))
 
     def test_kext_override_requires_known_target_and_uses_override(self):
         override = self.root / "override" / "Raphaeli.kext"

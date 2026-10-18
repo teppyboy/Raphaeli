@@ -403,11 +403,16 @@ def action_add() -> None:
     if idx is not None:
         log(f"config entry already present at Kernel>Add:{idx}")
         entry = cfg["Kernel"]["Add"][idx]
+        changed = False
         if entry.get("Comment") != KEXT_NAME:
             log(f"refreshing Comment -> {KEXT_NAME!r}")
             entry["Comment"] = KEXT_NAME
+            changed = True
+        if entry.get("MinKernel") != target.min_kernel or entry.get("MaxKernel") != target.max_kernel:
             entry["MinKernel"] = target.min_kernel
             entry["MaxKernel"] = target.max_kernel
+            changed = True
+        if changed:
             if DRY_RUN:
                 print(f"DRY-RUN: refresh :Kernel:Add:{idx} for {target.name}")
             else:
