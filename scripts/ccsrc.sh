@@ -6,8 +6,7 @@ K=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/kpi
 L=$K/freebsd-src/sys/compat/linuxkpi
 D=$K/drm-kmod
 A=$D/drivers/gpu/drm/amd
-SDK=$(xcrun --sdk macosx --show-sdk-path)
-KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+. "$X/scripts/kernel-sdk.sh"
 src=$1; shift
 OBJ_ROOT=${NMX_OBJ_ROOT:-$X/srcobj}
 target_flags=""
@@ -24,4 +23,4 @@ exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_
   -I$D/include -I$D/include/drm -I$D/include/uapi -I$D/drivers/gpu/drm -I$D/drivers/gpu -I$D/drivers \
   -I$A/amdgpu -I$A/include -I$A/include/asic_reg -I$A/acp/include -I$A/pm/inc -I$A/pm/swsmu/inc -I$A/pm/swsmu \
   -I$A/pm/powerplay/inc -I$A/pm/legacy-dpm -I$A/amdxcp -I$A/display -I$A/display/include -I$A/display/modules/inc -I$A/display/dc -I$A/display/amdgpu_dm -I$A/amdkfd \
-  $(sed "s/^/ /" $X/scripts/amd.flags | tr "\n" " ") -I$KF -I$K/freebsd-src/sys "$@" -c "$src" -o ${NMX_OBJ:-$OBJ_ROOT/$(basename "${src%.c}").o}
+  $(sed "s/^/ /" $X/scripts/amd.flags | tr "\n" " ") $KERNEL_SDK_INCLUDE -I$K/freebsd-src/sys "$@" -c "$src" -o ${NMX_OBJ:-$OBJ_ROOT/$(basename "${src%.c}").o}

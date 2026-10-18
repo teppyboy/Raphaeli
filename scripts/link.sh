@@ -3,6 +3,7 @@
 # srcobj/ (FreeBSD-on-xnu layer) and xnuobj/ (IOKit glue). Run build.sh + rt.sh first.
 set -euo pipefail
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
+. "$(cd "$(dirname "$0")" && pwd)/kernel-sdk.sh"
 TARGET_SELECTOR=sequoia
 TARGET_OPTION_SEEN=0
 OUT_ARG=""
@@ -114,7 +115,7 @@ xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlink
   "$OBJROOT"/*.o "$LKOBJ"/*.o "$SRCOBJ"/*.o "$XNUOBJ"/nmx_kext.o "$XNUOBJ"/nmx_devfs.o "$XNUOBJ"/nmx_dma.o \
   "$XNUOBJ"/nmx_fb.o "$XNUOBJ"/nmx_accel.o "$XNUOBJ"/nmx_accel_uc.o "$XNUOBJ"/nmx_mm.o "$XNUOBJ"/nmx_pci.o "$XNUOBJ"/nmx_platform.o "$XNUOBJ"/nmx_vm.o \
   $FWOBJ \
-  -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> "$LOG_DIR/link.log" || {
+  $KERNEL_SDK_LINK -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> "$LOG_DIR/link.log" || {
     grep -E "error|Undefined|duplicate" "$LOG_DIR/link.log" | head -40; exit 1; }
 cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 mkdir -p "$K/Resources/firmware/amdgpu"

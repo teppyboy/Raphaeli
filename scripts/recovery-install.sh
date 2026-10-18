@@ -30,13 +30,14 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# dist zip layout: tools/recovery-install.sh next to kext/, usr/lib/, firmware/
-# dev tree fallback: out/Raphaeli.kext + out/usr/lib + firmware/amdgpu
-if [[ -d $SCRIPT_DIR/../kext ]]; then
-  SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+# dist zip layout: tools/recovery-install.sh next to target/, usr/lib/, firmware/
+# dev tree fallback: out/target/<OS>/Raphaeli.kext + out/usr/lib + firmware/amdgpu
+SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+if [[ -f $SCRIPT_DIR/fw/stage.sh && -d $SRC_ROOT/target ]]; then
+  PACKAGED=1
   FW_STAGE_SH=$SCRIPT_DIR/fw/stage.sh
 else
-  SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)   # repo root: out/ + firmware/
+  PACKAGED=0
   FW_STAGE_SH=$SRC_ROOT/Raphaeli/Firmware/stage.sh
 fi
 KEXT_SRC=${RAPHAELI_KEXT:-}
@@ -129,9 +130,15 @@ done
 if [[ -z $KEXT_SRC ]]; then
   if [[ -n $TARGET_SELECTOR ]]; then
     KEXT_SRC=$SRC_ROOT/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
-  else
+    if [[ ! -d $KEXT_SRC && $PACKAGED -eq 0 ]]; then
+      KEXT_SRC=$SRC_ROOT/out/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
+      [[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+    fi
+  elif [[ $PACKAGED -eq 0 ]]; then
     KEXT_SRC=$SRC_ROOT/kext/Raphaeli.kext
     [[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+  else
+    die "packaged installs require --target sequoia or --target tahoe"
   fi
 fi
 

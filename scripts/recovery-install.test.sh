@@ -97,7 +97,11 @@ newvol() { # newvol <name> -> echoes path; minimal macOS volume shape
   echo "$v"
 }
 
-run_inst() { # run_inst <volume> <args...>
+run_inst() { # run_inst <volume> <args...>; package installs select Sequoia by default in tests
+  case " $* " in
+    *" --target "*|*--target=*) ;;
+    *) set -- "$@" --target sequoia ;;
+  esac
   PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" "$@"
 }
 
@@ -107,7 +111,7 @@ V1=$(newvol "Macintosh HD")
 V2=$(newvol "Other HD")
 t "explicit volume works"            0 run_inst "$V1" --dry-run
 t "ambiguous volumes fail"           1 env PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR \
-                                        "$DIST/tools/recovery-install.sh" --dry-run
+                                        "$DIST/tools/recovery-install.sh" --dry-run --target sequoia
 assert_out "ambiguity prints usage"  "usage: recovery-install.sh /Volumes/Macintosh"
 
 t "two candidates: explicit still ok" 0 run_inst "$V2" --dry-run
@@ -140,7 +144,7 @@ rm -rf "$V_TARGET_SEQUOIA" "$V_TARGET_TAHOE"
 printf 'boot-args\tnv_disable=1\n' > "$NVRAM_STATE"
 
 rm -rf "$V2"                          # single candidate -> auto-detected
-out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" --dry-run 2>&1)
+out=$(PATH="$SHIM:$PATH" RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" --dry-run --target sequoia 2>&1)
 if [[ $? == 0 && $out == *"target volume: $V1"* ]]; then
   echo "ok    single candidate auto-detected"; pass=$((pass + 1))
 else
@@ -154,7 +158,7 @@ assert_out "prints dylib copy"            "cp -f"
 assert_out "dylibs to Library/Raphaeli"   "$V1/Library/Raphaeli/usr/lib"
 assert_out "prints ICD json path"         "$V1/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"
 assert_out "prints absolute library_path" "library_path=/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
-assert_out "prints kext ditto"            "ditto *dist/kext/Raphaeli.kext"
+assert_out "prints kext ditto"            "ditto *dist/target/Sequoia/Raphaeli.kext"
 assert_out "prints chown root:wheel"      "chown -R root:wheel"
 assert_out "prints firmware staging"      "stage.sh"
 assert_out "prints mount -uw"             "mount -uw $V1"
@@ -294,7 +298,7 @@ BADKEXT=$WORK/bad/Raphaeli.kext
 mkdir -p "$BADKEXT/Contents"
 printf '<?xml version="1.0"?>\n<plist version="1.0"><dict>\n<key>CFBundleIdentifier</key><string>com.other.kext</string>\n</dict></plist>\n' > "$BADKEXT/Contents/Info.plist"
 out=$(RAPHAELI_KEXT=$BADKEXT RAPHAELI_FW_SRC=$DIST/firmware/amdgpu PATH="$SHIM:$PATH" \
-      RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" "$V1" --dry-run 2>&1)
+      RAPHAELI_VOLUMES_DIR=$VOLDIR "$DIST/tools/recovery-install.sh" "$V1" --dry-run --target sequoia 2>&1)
 if [[ $? == 1 && $out == *"unexpected bundle id 'com.other.kext'"* ]]; then
   echo "ok    wrong bundle id rejected"; pass=$((pass + 1))
 else

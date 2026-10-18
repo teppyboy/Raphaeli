@@ -10,8 +10,7 @@ L=$K/freebsd-src/sys/compat/linuxkpi
 D=$K/drm-kmod
 V=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/linux-6.14
 XE=$X/xe-src
-SDK=$(xcrun --sdk macosx --show-sdk-path)
-KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+. "$X/scripts/kernel-sdk.sh"
 src=$1; shift
 mkdir -p $X/obj-xe
 exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
@@ -27,4 +26,4 @@ exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_
   -DCONFIG_DRM_XE_JOB_TIMEOUT_MIN=1 -DCONFIG_DRM_XE_TIMESLICE_MAX=10000000 -DCONFIG_DRM_XE_TIMESLICE_MIN=1 \
   -DCONFIG_DRM_XE_PREEMPT_TIMEOUT=640000 -DCONFIG_DRM_XE_PREEMPT_TIMEOUT_MAX=10000000 -DCONFIG_DRM_XE_PREEMPT_TIMEOUT_MIN=1 \
   -DCONFIG_DRM_XE_ENABLE_SCHEDTIMEOUT_LIMIT=1 \
-  $(grep -v "KBUILD_MODNAME\|PARAM_PREFIX\|/drm/amd" $X/scripts/amd.flags | sed "s/^/ /" | tr "\n" " ") '-DKBUILD_MODNAME="xe"' -DLINUXKPI_PARAM_PREFIX=xe_ -DDRM_SYSCTL_PARAM_PREFIX=_xe -I$KF "$@" -c "$src" -o $X/obj-xe/$(basename "${src%.c}").o
+  $(grep -v "KBUILD_MODNAME\|PARAM_PREFIX\|/drm/amd" $X/scripts/amd.flags | sed "s/^/ /" | tr "\n" " ") '-DKBUILD_MODNAME="xe"' -DLINUXKPI_PARAM_PREFIX=xe_ -DDRM_SYSCTL_PARAM_PREFIX=_xe $KERNEL_SDK_INCLUDE "$@" -c "$src" -o $X/obj-xe/$(basename "${src%.c}").o

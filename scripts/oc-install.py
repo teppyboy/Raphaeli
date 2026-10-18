@@ -74,17 +74,9 @@ SYSTEM_ROOT_SET = False
 FW_SRC = ""
 TARGET_SELECTOR = ""
 KEXT_SRC_EXPLICIT = bool(os.environ.get("RAPHAELI_KEXT"))
-# kext source: dist zip layout (kext/ next to tools/), then dev-tree layout
-# (out/Raphaeli.kext at the repo root). Override: --kext-src
-# or $RAPHAELI_KEXT.
-def _default_kext_src():
-    for cand in (os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME),
-                 os.path.join(SCRIPT_DIR, "..", "out", KEXT_NAME)):
-        if os.path.isdir(cand):
-            return os.path.normpath(cand)
-    return os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME)
-
-KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or _default_kext_src()
+# Optional source override. Target selection remains mandatory so every injected
+# entry receives a real Darwin 24.x or 25.x kernel bound.
+KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or ""
 
 class TargetInfo(NamedTuple):
     name: str
@@ -122,7 +114,11 @@ def resolve_target(explicit: str, system_root: str, package_root: str) -> Target
             die(f"unsupported ProductVersion {version!r}; supported versions are 15.x (Sequoia) and 26.x (Tahoe)")
         metadata = TARGETS[selector]
     name, minimum, maximum = metadata
-    source = os.path.join(package_root, "target", name, KEXT_NAME)
+    source_candidates = (
+        os.path.join(package_root, "target", name, KEXT_NAME),
+        os.path.join(package_root, "out", "target", name, KEXT_NAME),
+    )
+    source = next((p for p in source_candidates if os.path.isdir(p)), source_candidates[0])
     return TargetInfo(name, os.path.normpath(source), minimum, maximum)
 
 
@@ -484,10 +480,7 @@ def restore_config_bytes(original: bytes) -> None:
 
 def action_add() -> None:
     package_root = os.path.dirname(SCRIPT_DIR)
-    if KEXT_SRC_EXPLICIT and not TARGET_SELECTOR and not SYSTEM_ROOT_SET:
-        target = TargetInfo("", KEXT_SRC, "23.4.0", "")
-    else:
-        target = resolve_target(TARGET_SELECTOR, SYS_ROOT if SYSTEM_ROOT_SET else "", package_root)
+    target = resolve_target(TARGET_SELECTOR, SYS_ROOT if SYSTEM_ROOT_SET else "", package_root)
     source = KEXT_SRC if KEXT_SRC_EXPLICIT else target.source_bundle
     if not os.path.isdir(os.path.join(source, "Contents")):
         die(f"not a kext bundle: {source}")
