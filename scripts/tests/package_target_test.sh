@@ -32,7 +32,10 @@ cp -R "$1" "$2"
 EOF
 cat > "$TMP/bin/plutil" <<'EOF'
 #!/bin/bash
-exit 0
+case "$1" in
+  -replace) exit 0 ;;
+  *) exec /usr/bin/plutil "$@" ;;
+esac
 EOF
 cat > "$TMP/bin/pkgbuild" <<'EOF'
 #!/bin/bash
@@ -52,9 +55,16 @@ mk_kext() {
   local path=$1 marker=$2
   mkdir -p "$path/Contents/MacOS"
   printf 'marker=%s\n' "$marker" > "$path/Contents/MacOS/Raphaeli"
+  chmod 755 "$path/Contents/MacOS/Raphaeli"
   cat > "$path/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<plist version="1.0"><dict><key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli.$marker</string></dict></plist>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
+<key>CFBundleExecutable</key><string>Raphaeli</string>
+<key>IOKitPersonalities</key><dict>
+<key>Raphaeli780M</key><dict><key>IOPCIPrimaryMatch</key><string>0x000015bf&amp;0xffffffff</string></dict>
+</dict>
+</dict></plist>
 EOF
 }
 
@@ -167,6 +177,22 @@ for selector in sequoia tahoe all; do
       ;;
   esac
 done
+
+# A stale build artifact with a vendor-wide PCI personality must never enter a release.
+plist="$ROOT/out/target/Sequoia/Raphaeli.kext/Contents/Info.plist"
+cp "$plist" "$TMP/Sequoia.Info.plist.original"
+cat > "$plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>me.tretrauit.raphaeli</string>
+<key>CFBundleExecutable</key><string>Raphaeli</string>
+<key>IOKitPersonalities</key><dict>
+<key>StaleVendorWide</key><dict><key>IOPCIPrimaryMatch</key><string>0x00001002&amp;0x0000ffff</string></dict>
+</dict>
+</dict></plist>
+EOF
+assert_package_fails --target sequoia "stale vendor-wide Info.plist rejected"
+mv "$TMP/Sequoia.Info.plist.original" "$plist"
 
 # Every required input failure must be explicit, including each target bundle
 # and each shared userspace/firmware input.

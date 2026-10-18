@@ -81,12 +81,66 @@ ARCH=x86_64
 NAME="Raphaeli-$VERSION-$ARCH"
 STAGE="dist/$NAME"
 
-for target_name in $TARGET_NAMES; do
-  target_kext="out/target/$target_name/Raphaeli.kext"
-  [ -f "$target_kext/Contents/Info.plist" ] || {
+validate_target_kext() {
+  target_kext=$1
+  plist="$target_kext/Contents/Info.plist"
+  [ -d "$target_kext/Contents" ] && [ -f "$plist" ] || {
     echo "$target_kext is not a kext bundle" >&2
     exit 1
   }
+  plutil -lint "$plist" >/dev/null || {
+    echo "$target_kext has an invalid Info.plist" >&2
+    exit 1
+  }
+  bundle_id=$(plutil -extract CFBundleIdentifier raw "$plist" 2>/dev/null) || {
+    echo "$target_kext has no CFBundleIdentifier" >&2
+    exit 1
+  }
+  [ "$bundle_id" = "me.tretrauit.raphaeli" ] || {
+    echo "$target_kext has unexpected bundle id '$bundle_id'" >&2
+    exit 1
+  }
+  executable=$(plutil -extract CFBundleExecutable raw "$plist" 2>/dev/null) || {
+    echo "$target_kext has no CFBundleExecutable" >&2
+    exit 1
+  }
+  case "$executable" in
+    ''|*/*)
+      echo "$target_kext has invalid executable '$executable'" >&2
+      exit 1
+      ;;
+  esac
+  executable_path="$target_kext/Contents/MacOS/$executable"
+  [ -f "$executable_path" ] && [ -x "$executable_path" ] || {
+    echo "$target_kext executable is missing or not executable: $executable_path" >&2
+    exit 1
+  }
+
+  # Convert through plutil, rather than grepping the source plist: this catches
+  # stale vendor-wide personalities regardless of their XML formatting.
+  plist_xml=$(mktemp "${TMPDIR:-/tmp}/raphaeli-package-plist.XXXXXX")
+  if ! plutil -convert xml1 -o "$plist_xml" "$plist"; then
+    rm -f "$plist_xml"
+    echo "$target_kext Info.plist could not be converted" >&2
+    exit 1
+  fi
+  if ! awk '
+    index($0, "<key>IOPCIPrimaryMatch</key>") { in_match = 1; count++; next }
+    in_match {
+      if (index($0, "<string>0x000015bf&amp;0xffffffff</string>") == 0) bad = 1
+      in_match = 0
+    }
+    END { if (count == 0 || bad) exit 1 }
+  ' "$plist_xml"; then
+    rm -f "$plist_xml"
+    echo "$target_kext has PCI matching outside validated 0x15bf scope" >&2
+    exit 1
+  fi
+  rm -f "$plist_xml"
+}
+
+for target_name in $TARGET_NAMES; do
+  validate_target_kext "out/target/$target_name/Raphaeli.kext"
 done
 [ -d out/usr/lib ] || { echo "missing out/usr/lib - build libdrm/RADV first" >&2; exit 1; }
 for userspace_file in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do

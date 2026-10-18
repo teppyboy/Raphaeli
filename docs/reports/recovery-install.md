@@ -34,8 +34,8 @@ from macOS Recovery") and covered by `scripts/recovery-install.test.sh`
 4. **Kext + firmware** — `ditto` to `<vol>/Library/Extensions/Raphaeli.kext`,
    `chown -R root:wheel`, `chmod -R 755`; firmware staged via the dist's
    `tools/fw/stage.sh` into `<vol>/Library/Raphaeli/firmware/amdgpu/`, after a
-   census against the 12 required `request_firmware()` names and optional
-   `SHA256SUMS` verification via `shasum -a 256 -c` (skipped if the package
+   census against the 11 required `request_firmware()` names plus optional
+   firmware and optional `SHA256SUMS` verification via `shasum -a 256 -c` (skipped if the package
    ships no manifest).
 5. **Boot-args + boot guard** — mirrors install.sh exactly: `raphaeli-amd=1`
    appended to `nvram boot-args` only with `--apply` (idempotent, preserves
@@ -63,7 +63,9 @@ recovery-install.sh /Volumes/Macintosh\ HD --uninstall
 
 ## Layout notes
 Source resolution mirrors the dist zip (tools/ sibling of kext/, usr/lib/,
-firmware/) with dev-tree fallback (out/Raphaeli.kext, out/usr/lib). Source-tree
+firmware/) with dev-tree fallback (out/Raphaeli.kext, out/usr/lib). Packaged target
+bundles are selected explicitly; package.sh rejects stale vendor-wide PCI personalities.
+Source-tree
 overrides: `RAPHAELI_KEXT`, `RAPHAELI_FW_SRC`.
 
 ## Test coverage (scripts/recovery-install.test.sh)

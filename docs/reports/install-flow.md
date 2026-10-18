@@ -20,9 +20,10 @@ Task: `Raphaeli/xkpi/install.sh` for the 780M target machine. Status: implemente
 - **Kext install:** `rm -rf` old, `ditto` copy to `/Library/Extensions/Raphaeli.kext`,
   `chown -R root:wheel` (kmutil treats non-root:wheel bundles as codeless).
 - **Validation:** `plutil -lint` on Info.plist, CFBundleIdentifier must be `me.tretrauit.raphaeli`,
-  `otool -l | LC_UUID` on the executable, `strings | grep -x me.tretrauit.raphaeli` for the kmod_info
-  name. Verified against the real `out/Raphaeli.kext` (UUID 94F730F6-F8A8-3FF2-BA9B-48EE3242F931).
-- **Firmware:** pre-census of the 12 required blobs (list mirrors `fw/stage.sh`) against
+  CFBundleExecutable must name an executable under `Contents/MacOS/`, `otool -l | LC_UUID` on
+  the executable, `strings | grep -x me.tretrauit.raphaeli` for the kmod_info name. Package-time
+  validation additionally requires every PCI personality to match validated device `0x15bf`.
+- **Firmware:** pre-census of the 11 required blobs plus optional firmware (lists mirror `fw/stage.sh`) against
   `$REPO/firmware/amdgpu` (overridable via `RAPHAELI_FW_SRC` for tests); aborts with missing list +
   linux-firmware URL. Then `sudo mkdir -p /Library/Raphaeli/firmware`, chown root:wheel,
   `sudo sh fw/stage.sh <src> /Library/Raphaeli/firmware`.
@@ -48,7 +49,7 @@ Task: `Raphaeli/xkpi/install.sh` for the 780M target machine. Status: implemente
 - `./install.test.sh` → 16/16 pass: help/unknown-option/dup-path/bad-path exits, full dry-run prints
   ditto + chown + stage.sh + kmutil create + auxkc path + cp apply step + boot-guard rollback, does
   not touch boot-args without `--apply`, missing-firmware census aborts with file list + fetch URL.
-- `./install.sh --dry-run` on the real tree: validates out/Raphaeli.kext, census aborts (see gap below).
+- `./install.sh --dry-run` validates the selected kext bundle before the firmware census; package-time target validation rejects stale vendor-wide bundles.
 - shellcheck: not installed on this host (`command -v shellcheck` empty); the harness lints both
   scripts clean of the patterns I could check by eye; install shellcheck separately if wanted.
 
