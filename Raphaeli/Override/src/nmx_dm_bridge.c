@@ -116,6 +116,28 @@ static void fill_timing(struct dc_crtc_timing *t, const NMXFbMode *m)
 
 /* commit a state that no longer contains 'stream' (amdgpu_dm_commit_zero_streams, for one stream;
    v1 drives one head, so the state left after the detach has no streams) */
+#define NMX_DM_STATUS_POLL_US 1000
+#define NMX_DM_STATUS_POLL_COUNT 50
+
+/* Read back the committed plane until DC exposes the address requested by the update. */
+static bool scanout_status_matches(struct dc_stream_state *stream, uint64_t expected, uint64_t *actual)
+{
+    for (unsigned int attempt = 0; attempt < NMX_DM_STATUS_POLL_COUNT; attempt++) {
+        struct dc_stream_status *status = dc_stream_get_status(stream);
+        if (status != NULL && status->plane_count > 0 && status->plane_states[0] != NULL) {
+            const struct dc_plane_address *a = &status->plane_states[0]->address;
+            uint64_t address = (uint64_t)a->grph.addr.low_part | ((uint64_t)a->grph.addr.high_part << 32);
+            if (actual != NULL)
+                *actual = address;
+            if (address == expected)
+                return true;
+        }
+        if (attempt + 1 < NMX_DM_STATUS_POLL_COUNT)
+            DELAY(NMX_DM_STATUS_POLL_US);
+    }
+    return false;
+}
+
 static int detach_stream(struct amdgpu_device *adev, struct dc_stream_state *stream)
 {
     struct dc *dc = adev->dm.dc;
@@ -283,15 +305,19 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     }
     dc_plane_state_release(plane);           /* our reference; the committed state holds its own */
 
-    /* the address of the plane the CRTC actually scans out, read back from the current state */
-    struct dc_stream_status *status = dc_stream_get_status(stream);
-    if (scanout_out != NULL && status != NULL && status->plane_count > 0) {
-        const struct dc_plane_address *a = &status->plane_states[0]->address;
-        *scanout_out = (uint64_t)a->grph.addr.low_part | ((uint64_t)a->grph.addr.high_part << 32);
+    /* A successful update is not enough: accept the mode only after DC reports our plane address. */
+    uint64_t actual = 0;
+    if (!scanout_status_matches(stream, scanout_phys, &actual)) {
+        printf("Raphaeli dm bridge: %ux%u scanout status refused: expected 0x%llx, got 0x%llx\n",
+               m->width, m->height, (unsigned long long)scanout_phys, (unsigned long long)actual);
+        err = -ETIMEDOUT;
+        goto release_stream;
     }
+    if (scanout_out != NULL)
+        *scanout_out = actual;
     printf("Raphaeli dm bridge: %ux%u @ %u.%02u Hz on link %u, scanout 0x%llx\n", m->width, m->height,
            (uint32_t)(m->pclk_hz / 1000000), (uint32_t)(m->pclk_hz % 1000000) / 10000, link->link_index,
-           (unsigned long long)(scanout_out ? *scanout_out : scanout_phys));
+           (unsigned long long)actual);
     err = 0;
 
 release_stream:
