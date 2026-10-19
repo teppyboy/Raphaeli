@@ -29,6 +29,7 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/bus.h>
+#include <machine/atomic.h>
 
 #include "amdgpu.h"
 #include "dc.h"
@@ -38,6 +39,38 @@
 
 #include "../../Kernel/nmx_dm_bridge.h"
 #include "../../Kernel/nmx_fb_internal.h"   /* NMXFbMode + nmx_fb_mode_sane (the boundary header forward-declares only) */
+
+enum dm_refusal_stage {
+    DM_REFUSE_MODE_INPUT,
+    DM_REFUSE_MODE_DEVICE,
+    DM_REFUSE_MODE_CONNECTOR,
+    DM_REFUSE_MODE_DETACH,
+    DM_REFUSE_MODE_STREAM_CREATE,
+    DM_REFUSE_MODE_VALIDATE,
+    DM_REFUSE_MODE_COMMIT,
+    DM_REFUSE_FLIP_PLANE_CREATE,
+    DM_REFUSE_FLIP_UPDATE,
+    DM_REFUSE_COUNT
+};
+
+static volatile unsigned int dm_refusals[DM_REFUSE_COUNT];
+
+static const char *dm_refusal_stage_name(enum dm_refusal_stage stage)
+{
+    static const char *const names[DM_REFUSE_COUNT] = {
+        "mode-input", "mode-device", "mode-connector", "mode-detach", "mode-stream-create",
+        "mode-validate", "mode-commit", "flip-plane-create", "flip-update"
+    };
+    return stage < DM_REFUSE_COUNT ? names[stage] : "unknown";
+}
+
+static int dm_refused(enum dm_refusal_stage stage, int err)
+{
+    unsigned int count = atomic_fetchadd_int(&dm_refusals[stage], 1) + 1;
+    device_printf(NULL, "Raphaeli dm bridge: refusal stage=%s count=%u errno=%d\n",
+                  dm_refusal_stage_name(stage), count, err);
+    return err;
+}
 
 /* the amdgpu_device of the attached driver on 'iopci', or NULL (same walk as nmx_accel_bridge.c) */
 static struct amdgpu_device *adev_of(void *iopci)
@@ -143,7 +176,7 @@ static int detach_stream(struct amdgpu_device *adev, struct dc_stream_state *str
     struct dc *dc = adev->dm.dc;
     struct dc_state *context = dc_state_create_current_copy(dc);
     if (context == NULL)
-        return -ENOMEM;
+        return dm_refused(DM_REFUSE_MODE_DETACH, -ENOMEM);
     enum dc_status res = DC_OK;
     if (!dc_state_rem_all_planes_for_stream(dc, stream, context))
         res = DC_FAIL_DETACH_SURFACES;
@@ -155,14 +188,14 @@ static int detach_stream(struct amdgpu_device *adev, struct dc_stream_state *str
         res = dc_commit_streams(dc, &params);   /* 0 streams: the detached stream leaves the pipe */
     }
     dc_state_release(context);
-    return res == DC_OK ? 0 : -EIO;
+    return res == DC_OK ? 0 : dm_refused(DM_REFUSE_MODE_DETACH, -EIO);
 }
 
 int nmx_dm_bridge_init(void *iopci)
 {
     struct dc *dc = dc_of(iopci);
     if (dc == NULL)
-        return -ENODEV;
+        return dm_refused(DM_REFUSE_MODE_DEVICE, -ENODEV);
     uint32_t count = 0;
     for (int pass = 0; pass < 2; pass++)
         for (uint8_t i = 0; i < dc->link_count; i++) {
@@ -171,14 +204,14 @@ int nmx_dm_bridge_init(void *iopci)
                 continue;
             if ((pass == 0) != (link->local_sink->sink_signal == SIGNAL_TYPE_EDP))
                 continue;
-            printf("Raphaeli dm bridge: connector %u: link %u signal %d sink \"%s\"\n", count,
-                   link->link_index, link->local_sink->sink_signal,
-                   link->local_sink->edid_caps.display_name);
+            device_printf(NULL, "Raphaeli dm bridge: connector %u: link %u signal %d sink \"%s\"\n", count,
+                          link->link_index, link->local_sink->sink_signal,
+                          link->local_sink->edid_caps.display_name);
             count++;
         }
     if (count == 0) {
-        printf("Raphaeli dm bridge: the DC core is up but no connector has a sink\n");
-        return -ENODEV;
+        device_printf(NULL, "Raphaeli dm bridge: the DC core is up but no connector has a sink\n");
+        return dm_refused(DM_REFUSE_MODE_CONNECTOR, -ENODEV);
     }
     return (int)count;
 }
@@ -190,15 +223,15 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
         *scanout_out = 0;
     if (m == NULL || scanout_phys == 0 ||
         !nmx_fb_mode_sane(m->pclk_hz, m->width, m->height, m->hblank, m->vblank))
-        return -EINVAL;
+        return dm_refused(DM_REFUSE_MODE_INPUT, -EINVAL);
 
     struct amdgpu_device *adev = adev_of(iopci);
     struct dc *dc = dc_of(iopci);
     if (adev == NULL || dc == NULL)
-        return -ENODEV;
+        return dm_refused(DM_REFUSE_MODE_DEVICE, -ENODEV);
     struct dc_link *link = link_for(dc, index);
     if (link == NULL || link->local_sink == NULL)
-        return -ENODEV;
+        return dm_refused(DM_REFUSE_MODE_CONNECTOR, -ENODEV);
     struct dc_sink *sink = link->local_sink;
 
     /* the whole sequence under dm's dc_lock, like every dm commit */
@@ -208,7 +241,6 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     if (dc_get_current_stream_count(dc) > 0) {
         int r = detach_stream(adev, dc_get_stream_at_index(dc, 0));
         if (r) {
-            printf("Raphaeli dm bridge: detaching the previous stream failed (%d)\n", r);
             mutex_unlock(&adev->dm.dc_lock);
             return r;
         }
@@ -218,7 +250,7 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     struct dc_stream_state *stream = dc_create_stream_for_sink(sink);
     if (stream == NULL) {
         err = -ENOMEM;
-        goto out;
+        goto refuse_stream_create;
     }
     fill_timing(&stream->timing, m);
     stream->out_transfer_func.type = TF_TYPE_PREDEFINED;
@@ -230,10 +262,10 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
 
     enum dc_status res = dc_validate_stream(dc, stream);
     if (res != DC_OK) {
-        printf("Raphaeli dm bridge: %ux%u@%llukHz on link %u refused: dc status %d\n", m->width,
-               m->height, (unsigned long long)(m->pclk_hz / 1000), link->link_index, res);
+        device_printf(NULL, "Raphaeli dm bridge: %ux%u@%llukHz on link %u refused: dc status %d\n", m->width,
+                      m->height, (unsigned long long)(m->pclk_hz / 1000), link->link_index, res);
         err = -EINVAL;
-        goto release_stream;
+        goto refuse_validate;
     }
 
     struct dc_commit_streams_params params = {};
@@ -242,9 +274,9 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     params.power_source = DC_POWER_SOURCE_AC;
     res = dc_commit_streams(dc, &params);
     if (res != DC_OK) {
-        printf("Raphaeli dm bridge: the %ux%u commit failed: dc status %d\n", m->width, m->height, res);
+        device_printf(NULL, "Raphaeli dm bridge: the %ux%u commit failed: dc status %d\n", m->width, m->height, res);
         err = -EIO;
-        goto release_stream;
+        goto refuse_commit;
     }
 
     /* one linear XRGB8888 plane over the scanout buffer (the plane dm commits on every modeset) */
@@ -288,7 +320,7 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     struct dc_plane_state *plane = dc_create_plane_state(dc);
     if (plane == NULL) {
         err = -ENOMEM;
-        goto release_stream;
+        goto refuse_plane_create;
     }
 
     struct dc_surface_update srf = {};
@@ -298,10 +330,10 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     srf.scaling_info = &sinfo;
     struct dc_stream_update stream_update = {};
     if (!dc_update_planes_and_stream(dc, &srf, 1, stream, &stream_update)) {
-        printf("Raphaeli dm bridge: the %ux%u plane update failed\n", m->width, m->height);
+        device_printf(NULL, "Raphaeli dm bridge: the %ux%u plane update failed\n", m->width, m->height);
         dc_plane_state_release(plane);       /* not retained by DC: the update failed */
         err = -EIO;
-        goto release_stream;
+        goto refuse_flip_update;
     }
     dc_plane_state_release(plane);           /* our reference; the committed state holds its own */
 
@@ -315,11 +347,27 @@ int nmx_dm_bridge_set_mode(void *iopci, uint32_t index, const NMXFbMode *m, uint
     }
     if (scanout_out != NULL)
         *scanout_out = actual;
-    printf("Raphaeli dm bridge: %ux%u @ %u.%02u Hz on link %u, scanout 0x%llx\n", m->width, m->height,
-           (uint32_t)(m->pclk_hz / 1000000), (uint32_t)(m->pclk_hz % 1000000) / 10000, link->link_index,
-           (unsigned long long)actual);
+    device_printf(NULL, "Raphaeli dm bridge: %ux%u @ %u.%02u Hz on link %u, scanout 0x%llx\n", m->width, m->height,
+                  (uint32_t)(m->pclk_hz / 1000000), (uint32_t)(m->pclk_hz % 1000000) / 10000, link->link_index,
+                  (unsigned long long)actual);
     err = 0;
+    goto release_stream;
 
+refuse_flip_update:
+    err = dm_refused(DM_REFUSE_FLIP_UPDATE, err);
+    goto release_stream;
+refuse_plane_create:
+    err = dm_refused(DM_REFUSE_FLIP_PLANE_CREATE, err);
+    goto release_stream;
+refuse_commit:
+    err = dm_refused(DM_REFUSE_COMMIT, err);
+    goto release_stream;
+refuse_validate:
+    err = dm_refused(DM_REFUSE_VALIDATE, err);
+    goto release_stream;
+refuse_stream_create:
+    err = dm_refused(DM_REFUSE_STREAM_CREATE, err);
+    goto out;
 release_stream:
     /* the committed state holds its own reference; drop ours */
     dc_stream_release(stream);
