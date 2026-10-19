@@ -150,6 +150,11 @@ class RaphaeliResource : public IOAccelResource2 {
 #endif
 public:
     void rebuildPagingBuffer() APPLE_KEXT_OVERRIDE;
+#if !defined(NM_TAHOE)
+    void pageoff(IOAccelEvent *, bool, bool *) APPLE_KEXT_OVERRIDE;
+    void pageoff(IOAccelEvent *, bool, bool *, unsigned long long) APPLE_KEXT_OVERRIDE;
+    void pageoffIfNeeded(unsigned int, unsigned int) APPLE_KEXT_OVERRIDE;
+#endif
     uint64_t getLevelOffset(unsigned char, unsigned char, int *) APPLE_KEXT_OVERRIDE;
     uint64_t getBackingLevelOffset(unsigned char, unsigned char, int *) APPLE_KEXT_OVERRIDE;
     uint64_t calculateIOSurfaceDeviceCacheVRAMBytes(unsigned long long *, unsigned long long *) APPLE_KEXT_OVERRIDE;
@@ -172,9 +177,9 @@ public:
     bool allocPhysical() APPLE_KEXT_OVERRIDE;
     void deallocPhysical() APPLE_KEXT_OVERRIDE;
     uint64_t getPhysicalSegment(unsigned long long offset, unsigned long long *len) APPLE_KEXT_OVERRIDE;
-    uint64_t fBo = 0;      /* the bridge's pinned GEM BO (opaque handle, freed exactly once) */
-    uint64_t fPhys = 0;    /* its stable device address */
-    uint64_t fBytes = 0;
+    uint64_t fBo = 0;      /* reserved for a verified AMD GEM/TTM owner; never populated by the fail-closed path */
+    uint64_t fPhys = 0;    /* stable device address, only valid with verified backing */
+    uint64_t fBytes = 0;  /* length, only valid with verified backing */
 };
 class RaphaeliSurface : public IOAccelLegacySurface {
     OSDeclareDefaultStructors(RaphaeliSurface)
@@ -187,6 +192,10 @@ public:
     bool copyFromBuffer(int, int, int, int, unsigned int, unsigned int, IOAccelEvent *, IOAccelResource2 *, IOAccelSysMemory *, unsigned int, unsigned long long, unsigned int) APPLE_KEXT_OVERRIDE;
     bool copyToBuffer(int, int, int, int, unsigned int, unsigned int, IOAccelEvent *, IOAccelResource2 *, IOAccelSysMemory *, unsigned int, unsigned long long, unsigned int) APPLE_KEXT_OVERRIDE;
     void submitSwapCopy(IOAccelEvent *, IOAccelResource2 *, IOAccelResource2 *) APPLE_KEXT_OVERRIDE;
+#if !defined(NM_TAHOE)
+    void set_shape_backing_length_ext(eIOAccelSurfaceShapeBits, unsigned int, unsigned long long, unsigned int,
+                                      unsigned long long, IOAccelDeviceRegion *, unsigned long long) APPLE_KEXT_OVERRIDE;
+#endif
     void shapeSurface(unsigned int, unsigned short, unsigned short) APPLE_KEXT_OVERRIDE;
     uint32_t getDirtyBufferBitsFromPrivateModeBits(unsigned long long) APPLE_KEXT_OVERRIDE;
 };

@@ -1,9 +1,8 @@
 /*
  * The Raphaeli accelerator's vendor objects: what Apple's IOAcceleratorFamily2 asks the accelerator for while
  * running its user clients (event machine, GPU VA tasks, memory maps, resources, memories, surfaces, contexts).
- * Mirrors the reference driver's stubs (research/nvidia-macos-driver/kexts/NVRM/accel/nvaccel_stubs.h) with the
- * NVRM/RM calls replaced by v0 refusals: this GPU's page tables and VRAM allocator are the amdgpu driver's
- * (nmx_kext.cpp / the DRM layer), and no bridge exists yet, so every mapping op is logged and refused honestly.
+ * Mirrors the reference driver's object shape only. AMD surface backing stays fail-closed: the GPU's page tables and
+ * GEM/TTM allocator belong to amdgpu, but no AMD-specific private-family ownership/geometry contract is proven.
  * Nothing here executes GPU work; unknown family input reaches only these virtuals, none of which can panic.
  */
 #include "nmx_accel.h"
@@ -75,75 +74,83 @@ void RaphaeliMemoryMap::releaseFromGPUPageTable() {}
 bool RaphaeliMemoryMap::updateGPUPageTable() { return false; }
 OSDefineMetaClassAndStructors(RaphaeliMemoryMap, IOAccelMemoryMap)
 
-/* ---- resource: the family's paging-buffer and aperture hooks; v0 has no VRAM, so the aperture stays closed ------ */
+/* ---- resource: surface backing/page-off is deliberately fail-closed ------------------------------------------- */
 
 void RaphaeliResource::rebuildPagingBuffer()
 {
     static unsigned n;
-    if (uc_log_sample(n, 4)) ACCELLOG("resource rebuildPagingBuffer - nothing to rebuild (v0)");
+    if (uc_log_sample(n, 4)) ACCELLOG("resource rebuildPagingBuffer REFUSED - AMD GEM/TTM surface backing is not mapped");
 }
+#if !defined(NM_TAHOE)
+void RaphaeliResource::pageoff(IOAccelEvent *, bool, bool *completed)
+{
+    static unsigned n;
+    if (completed) *completed = false;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource pageoff REFUSED - no AMD GEM/TTM eviction mapping");
+}
+
+void RaphaeliResource::pageoff(IOAccelEvent *, bool, bool *completed, unsigned long long)
+{
+    static unsigned n;
+    if (completed) *completed = false;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource pageoff(ext) REFUSED - no AMD GEM/TTM eviction mapping");
+}
+void RaphaeliResource::pageoffIfNeeded(unsigned int, unsigned int)
+{
+    static unsigned n;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource pageoffIfNeeded REFUSED - no AMD GEM/TTM eviction mapping");
+}
+#endif
 uint64_t RaphaeliResource::getLevelOffset(unsigned char, unsigned char, int *mip)
 {
+    static unsigned n;
     if (mip) *mip = 0;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource getLevelOffset REFUSED - AMD surface layout is unverified");
     return 0;
 }
 uint64_t RaphaeliResource::getBackingLevelOffset(unsigned char, unsigned char, int *mip)
 {
+    static unsigned n;
     if (mip) *mip = 0;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource getBackingLevelOffset REFUSED - AMD surface layout is unverified");
     return 0;
 }
 uint64_t RaphaeliResource::calculateIOSurfaceDeviceCacheVRAMBytes(unsigned long long *size, unsigned long long *planes)
 {
+    static unsigned n;
     if (size) *size = 0;
     if (planes) *planes = 1;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource VRAM cache size REFUSED - AMD surface layout is unverified");
     return 0;
 }
 bool RaphaeliResource::addToAperture()
 {
     static unsigned n;
-    if (uc_log_sample(n, 8)) ACCELLOG("resource addToAperture REFUSED - no VRAM allocator (v0)");
+    if (uc_log_sample(n, 8)) ACCELLOG("resource addToAperture REFUSED - no AMD GPU VM mapping");
     return false;
 }
 void RaphaeliResource::removeFromAperture() {}
 void *RaphaeliResource::getApertureMemoryDescriptor(unsigned long long *offset)
 {
     if (offset) *offset = 0;
+    static unsigned n;
+    if (uc_log_sample(n, 8)) ACCELLOG("resource getApertureMemoryDescriptor REFUSED - no AMD GEM/TTM aperture mapping");
     return nullptr;
 }
 OSDefineMetaClassAndStructors(RaphaeliResource, IOAccelResource2)
 
 OSDefineMetaClassAndStructors(RaphaeliSysMemory, IOAccelSysMemory)
 
-/* ---- vid memory: real VRAM through the bridge (Override/src/nmx_accel_bridge.c: amdgpu's own kernel GEM
-   helper). The object is backed by one pinned GEM BO; the device address is what getPhysicalSegment hands
-   out. No GPU page tables exist yet, so the map-side commit still refuses — allocations are real, GPU VM is
-   the next lane. Geometry comes from the family's ivars: length at +0x40, phys slot at +0xc8 (reference). */
+/* ---- vid memory: GEM/TTM ownership is known, but the AMD family-to-surface contract is not ------------------ */
 
 bool RaphaeliVidMemory::allocPhysical()
 {
     static unsigned n;
-    const unsigned long long want = *(const volatile unsigned long long *)((const unsigned char *)this + 0x40);
-    if (!want)
-        return false;
-    if (fBo) {   /* already backed: AMD's own shape (false when re-allocating a live allocation) */
-        if (uc_log_sample(n, 8)) ACCELLOG("vid memory allocPhysical(%p): already backed by %llu bytes", this, fBytes);
-        return false;
-    }
-    uint64_t bo = 0, addr = 0;
-    void *cpu = nullptr;
-    int r = nmx_accel_bridge_alloc(want, 4096, 4 /* AMDGPU_GEM_DOMAIN_VRAM */, &bo, &addr, &cpu);
-    if (r) {
-        if (uc_log_sample(n, 8)) ACCELLOG("vid memory allocPhysical(%p): %llu bytes refused by the bridge (%d)", this, want, r);
-        return false;
-    }
-    fBo = bo;
-    fPhys = nmx_accel_bridge_dmap(bo);
-    fBytes = want;
-    *(volatile unsigned long long *)((unsigned char *)this + 0xc8) = fPhys;   /* the family's phys slot */
+    /* Do not reuse the NVIDIA reconstruction's +0x40/+0xc8 ivars. Until AMD evidence identifies the
+       allocation length, owner, eviction, and GPU-VA lifecycle, allocating a BO here could leak or expose it. */
     if (uc_log_sample(n, 8))
-        ACCELLOG("vid memory allocPhysical(%p): %llu bytes of REAL VRAM - device address 0x%llx (cpu %p)",
-                 this, fBytes, (unsigned long long)fPhys, cpu);
-    return fPhys != 0;
+        ACCELLOG("vid memory allocPhysical REFUSED - AMD GEM/TTM surface backing contract is unverified");
+    return false;
 }
 
 void RaphaeliVidMemory::deallocPhysical()
@@ -151,29 +158,39 @@ void RaphaeliVidMemory::deallocPhysical()
     static unsigned n;
     if (!fBo)
         return;
-    if (uc_log_sample(n, 8)) ACCELLOG("vid memory deallocPhysical(%p): releasing %llu bytes", this, fBytes);
+    if (uc_log_sample(n, 8)) ACCELLOG("vid memory deallocPhysical(%p): releasing unverified backing", this);
     nmx_accel_bridge_free(fBo, fPhys, nullptr);
     fBo = fPhys = fBytes = 0;
-    *(volatile unsigned long long *)((unsigned char *)this + 0xc8) = 0;
 }
 
 uint64_t RaphaeliVidMemory::getPhysicalSegment(unsigned long long offset, unsigned long long *len)
 {
+    static unsigned n;
     if (len) *len = 0;
-    if (!fPhys || offset >= fBytes)
+    if (!fPhys || offset >= fBytes) {
+        if (uc_log_sample(n, 8)) ACCELLOG("vid memory getPhysicalSegment REFUSED - no verified surface backing");
         return 0;
+    }
     if (len) *len = fBytes - offset;
     return fPhys + offset;
 }
 OSDefineMetaClassAndStructors(RaphaeliVidMemory, IOAccelVidMemory)
 
-/* ---- surface: the compositor's swap path; v0 swaps are logged, never flipped (RaphaeliFB owns the panel) -------- */
+/* ---- surface: backing is not mapped until the AMD GEM/TTM and GPU-VM contract is proven ----------------------- */
 
 void RaphaeliSurface::setSyncCommand(unsigned int *, unsigned int &s1, unsigned int &s2, _AMDSurfaceSwapSyncOptions const &) const
 {
     s1 = s2 = 0;
 }
 void RaphaeliSurface::_pure335() {}
+void RaphaeliSurface::set_shape_backing_length_ext(eIOAccelSurfaceShapeBits, unsigned int, unsigned long long,
+                                                    unsigned int, unsigned long long, IOAccelDeviceRegion *,
+                                                    unsigned long long)
+{
+    static unsigned n;
+    if (uc_log_sample(n, 8))
+        ACCELLOG("surface backing REFUSED - AMD GEM/TTM surface layout and GPU VA mapping are unverified");
+}
 bool RaphaeliSurface::copyFromBuffer(int, int, int, int, unsigned int, unsigned int, IOAccelEvent *, IOAccelResource2 *,
                                      IOAccelSysMemory *, unsigned int, unsigned long long, unsigned int)
 {

@@ -37,11 +37,11 @@ calls is selector 0, then typically 1/2/7:
 
 **Resource plane — `IOAccelSharedUserClient2` (360 B, `sSharedMethods[21]`):**
 `new_resource` (sel 0) is the memory path: family → `createResource`/`createSysMemory`/
-`createVidMemory` factories → `IOAccelVidMemory::allocPhysical` (vendor). With this lane
-that call is REAL (§3): one pinned amdgpu GEM BO (VRAM domain 4) via the bridge, device
-address in `getPhysicalSegment`. The map side (`IOAccelMemoryMap::commitIntoGPUPageTable`)
-still refuses — no page tables yet — so the family unwinds the mapping honestly and the
-client sees the v0 line exactly where it is drawn.
+`createVidMemory` factories → `IOAccelVidMemory::allocPhysical` (vendor). Surface backing
+now refuses fail-closed: the AMD GEM/TTM object owner, resource geometry, page-off
+lifecycle, and GPU-VA mapping are not proven by the available evidence. The map side
+(`IOAccelMemoryMap::commitIntoGPUPageTable`) also refuses, so the family unwinds the
+mapping honestly and the client sees the v0 line exactly where it is drawn.
 
 **Submit plane — `IOAccelCommandQueue` (family, `sCommandQueueMethods`):** the client
 calls `set_notification_port`, `get_command_queue_info`, `set_quality_of_service` and
@@ -73,7 +73,7 @@ IOServiceOpen(nub, WindowServer task, type)
    │                         sel7 get_device_info, sel3 get_surface_info, …
    ├─ IOAccelSharedUserClient2:
    │    new_resource ─→ createSysMemory/createVidMemory → RaphaeliVidMemory::allocPhysical
-   │                         └─ nmx_accel_bridge_alloc (amdgpu_bo_create_kernel, VRAM) — REAL BO
+   │                         └─ REFUSED — AMD GEM/TTM surface backing contract unverified
    │    page_off/finish_object/set_purgeable/allocate_fence_memory/get_memory_data … (family + vmem)
    ├─ IOAccelCommandQueue:   set_notification_port, get_command_queue_info
    │    submit_command_buffers → processCommandBuffer → connected context
@@ -93,17 +93,14 @@ unknown client types / selectors ≥ table end → kIOReturnUnsupported (invaria
 | device config/name/event-machine/device-info/surface-info | real (family + our config) |
 | stamp page: alloc, `getStampMemory`, client-task mapping (family), `writeStamp` writes | real |
 | client-task VA accounting (`IORangeAllocator` pool → family `IOAccelTask`) | real |
-| VRAM allocation (`allocPhysical` → bridge `nmx_accel_bridge_alloc/dmap/free`) | real GEM BOs |
+| VRAM/surface backing (`allocPhysical`, resource offsets, page-off) | **refused** — AMD GEM/TTM contract unverified |
 | GPU VM (`commitIntoGPUPageTable`/`updateGPUPageTable`) | **refused** — page tables are the next lane |
 | queue submit engine path | **never reached in v0** — family fails the submit at the map step |
 | fences/syncobj, display pipe, surface swap, Metal plugin | unchanged from v0 (logged/refused) |
 
-Bridge additions (`Override/src/nmx_accel_bridge.c`, declared in `Compat/include/nmx_port.h`):
-`nmx_accel_bridge_alloc(size, align, domain, &bo, &gpu_addr, &cpu)` — `amdgpu_bo_create_kernel`,
-same device/suspend/shutdown gates as the submit path; `nmx_accel_bridge_dmap(bo)` —
-`amdgpu_bo_gpu_offset`; `nmx_accel_bridge_free(bo, gpu_addr, cpu)` — `amdgpu_bo_free_kernel`.
-The selftest (`raphaeli-accel-test=1`) now also allocates/frees one 4096 B VRAM BO through
-this path and logs PASS/FAIL.
+The generic bridge still exposes `nmx_accel_bridge_alloc/dmap/free` for verified
+kernel-internal callers and its selftest, but surface backing does not call it: the
+private IOAccelerator-to-AMD ownership and geometry contract is unverified.
 
 ## 4. Where the submit wire-in lands (next lane) — decided
 
@@ -135,9 +132,9 @@ must decode `IOAccelCommandStreamInfo` + the AMD token path and THEN wire
 - The family's client-task stamp mapping and `IOAccelTask` bookkeeping offsets (+0x78,
   +0xe8, +0x168) are read from the 15.7.8 binary; a family update shifts them loudly
   (same risk class as the reconstructed vtables).
-- `RaphaeliVidMemory` geometry comes from family ivars at +0x40 (length) / +0xc8 (phys
-  slot) — the reference-proven offsets, but the first real allocation on hardware must
-  confirm them.
+- The NVIDIA-derived family ivar offsets (+0x40 length / +0xc8 physical slot) are
+  intentionally not used for AMD surface backing. An AMD-specific owner/geometry and
+  page-off/VM audit is required before allocation can be enabled.
 - Task pool is 32 allocators; the 33rd concurrent client task refuses (`createTask`
   logs FAILED, family sees a NULL task) — honest, and matches the reference's carrier
   math.
