@@ -23,7 +23,8 @@ class StageGraphicsTest(unittest.TestCase):
         self.recovery = self.root / "Recovery"
         self.kdk = self.root / "KDK"
         self.config = self.efi / "EFI/OC/config.plist"
-        self.config.parent.joinpath("Kexts").mkdir(parents=True)
+        self.config.parent.joinpath("Kexts/Raphaeli.kext/Contents/MacOS").mkdir(parents=True)
+        (self.config.parent / "Kexts/Raphaeli.kext/Contents/MacOS/Raphaeli").write_bytes(b"fixture Raphaeli")
         self.original = {"Kernel": {"Add": [
             {"BundlePath": "Lilu.kext", "Enabled": True},
             {"BundlePath": "Raphaeli.kext", "Enabled": True}], "Force": []},
@@ -72,14 +73,15 @@ class StageGraphicsTest(unittest.TestCase):
         result = plistlib.loads(self.config.read_bytes())
         entries = result["Kernel"]["Add"]
         self.assertEqual([entry["BundlePath"] for entry in entries], [
-            "Lilu.kext", "RaphaeliDependencies/IOGraphicsFamily.kext",
-            "RaphaeliDependencies/IOAcceleratorFamily2.kext", "Raphaeli.kext"])
+            "Lilu.kext", "Raphaeli.kext/Contents/PlugIns/IOGraphicsFamily.kext",
+            "Raphaeli.kext/Contents/PlugIns/IOAcceleratorFamily2.kext", "Raphaeli.kext"])
         self.assertEqual(result["NVRAM"], self.original["NVRAM"])
         self.assertEqual(entries[1]["MinKernel"], "25.6.0")
         self.assertEqual(entries[1]["MaxKernel"], "25.6.99")
         backups = list(config.parent.glob("config.plist.raphaeli-graphics-backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertEqual(backups[0].read_bytes(), before)
+        self.assertFalse((self.efi / "EFI/OC/Kexts/RaphaeliDependencies").exists())
         for name in MODULE.FAMILIES:
             self.assertTrue((dest / (name + ".kext/Contents/MacOS/" + name)).is_file())
         with self.assertRaises(ValueError):

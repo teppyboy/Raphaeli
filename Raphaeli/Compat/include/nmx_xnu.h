@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+/* Compatibility string search; avoids colliding with MacKernelSDK's differently-qualified strnstr declaration. */
+char *nmx_compat_strnstr(const char *s, const char *find, size_t slen);
+
 /* cache modes for mappings (match FreeBSD's VM_MEMATTR_* values in machine/vm.h) */
 #define NMX_CACHE_UC 0x00
 #define NMX_CACHE_WC 0x01

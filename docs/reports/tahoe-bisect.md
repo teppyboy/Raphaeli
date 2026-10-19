@@ -69,15 +69,12 @@ is unchanged. One line of essence, plus a comment stating the constraint.
 Regression guard: `scripts/fw-bundle.test.sh` now fails when `nm -m` shows any
 UNDEFINED `_nmx_fw_*` symbol in the linked binary.
 
-## Verification (dev host)
+## Historical verification context
 
-- rebuild + relink: binary undefined set = 1012 = 02e386e's 1010 + the 3
-  justified IOAccel/IORange methods − `___strncpy_chk`; zero `__nmx_fw_*`
-  undefineds; both symbols of every blob now match one defined name.
-- `build.sh` 900/900, `rt.sh` green, `link.sh out-disp` ok
-  (`Raphaeli 39a7f97f 14297712 B`).
-- `kmutil inspect -V tb -p $PWD/out-disp/Raphaeli.kext` rc=0.
-- `fw-bundle.test.sh`, `install.test.sh`, `oc-install.test.sh` all pass.
+The commands below describe an older dev-host artifact and are not current
+Tahoe build validation. Exact target ABI validation remains blocked on macOS
+26.6.2 / build 25G83; the current source guard must continue rejecting Tahoe.
+The old binary/prelink observations do not establish Tahoe support.
 
 Hardware-gated: actual Tahoe RecoveryOS injection can only be confirmed on the
-target machine — mark unverified until the user re-tests with the fixed build.
+target machine. Keep Tahoe ABI status unvalidated.

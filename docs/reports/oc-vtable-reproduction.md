@@ -171,7 +171,10 @@ image actually includes the matching executable kexts. Some system bundles
 have plists but no standalone executables; verify files first. Otherwise a
 matching-build KDK or target System KC extraction is needed. Do not inject
 Sequoia families into Tahoe, remove graphics support in Recovery, or ship an
-unverified cross-build replacement.
+unverified cross-build replacement. The staging experiment now places the
+validated dependency bundles inside `Raphaeli.kext/Contents/PlugIns/` and
+references those nested paths explicitly; runtime acceptance still requires a
+real OpenCore prelink result against the target KC.
 
 The intermittent reboot remains unexplained: capture panic evidence. OC
 injection failure occurs before Raphaeli entry/start, so do not diagnose a

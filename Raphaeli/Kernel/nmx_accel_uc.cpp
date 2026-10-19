@@ -222,3 +222,7 @@ OSDefineMetaClassAndStructors(Raphaeli2DContext, IOAccel2DContext2)
 
 OSDefineMetaClassAndStructors(RaphaeliCLContext, IOAccelCLContext2)
 OSDefineMetaClassAndStructors(RaphaeliVideoContext, IOAccelVideoContext2)
+#if defined(NM_TAHOE)
+OSDefineMetaClassAndStructors(RaphaeliDisplayPipe, IOAccelLegacyDisplayPipe)
+NM_TAHOE_FWD_DEFS
+#endif

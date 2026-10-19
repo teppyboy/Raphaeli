@@ -60,13 +60,13 @@ the next boot if a previous attach never returned; `-amdgpuoff` parks per-boot.
 
 ## Linux path (no macOS available)
 
-    python3 oc-install.py /media/user/EFI --add
+    python3 oc-install.py /media/user/EFI --add --target sequoia --system-root /mnt/target
     oc-install.sh /media/user/EFI --status --system-root /mnt/target
 
 Mounting: `lsblk -pno NAME,FSTYPE,PARTLABEL,MOUNTPOINT` finds the vfat EFI
 partition; if unmounted, `udisksctl mount -b /dev/sdXN` is used; if udisksctl
 is absent the tool exits with the exact manual command to run
-(`sudo mount /dev/sdXN /mnt/efi && python3 oc-install.py /mnt/efi --add`).
+(`sudo mount /dev/sdXN /mnt/efi && python3 oc-install.py /mnt/efi --add --target sequoia --system-root /mnt/target`).
 
 ## Validation
 
@@ -79,6 +79,45 @@ missing-Add-array creation, bad target rejection, and a direct python-core
 smoke cycle (add/enable/remove without the shell wrapper). Result: ALL TESTS
 PASSED. `python3 -m py_compile oc-install.py` clean.
 
+## Task 2 fix round 2
+
+Existing-entry refresh is transactional. `--add` now rejects a disabled existing
+entry before firmware staging, creates a config backup before changing bounds,
+comments, duplicates, or insertion, prepares and stamps a sibling staging
+bundle, validates firmware staging, then updates `config.plist` and swaps the
+staged bundle. Existing staged bundles remain in a temporary rollback path until
+config commit succeeds; config bytes and the old bundle are restored on commit
+failure. The backup preserves the exact pre-mutation config for every `--add`.
+
+Regression coverage verifies backup fidelity for an existing-entry bounds
+refresh, rejects disabled entries before firmware staging, and simulates a copy
+failure while an existing entry and staged bundle are present, asserting both
+remain byte-for-byte unchanged and no staging residue remains.
+
+Validation:
+
+```sh
+python3 -m unittest scripts/tests/oc_install_target_test.py
+bash scripts/oc-install.test.sh
+python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test.py
+git diff --check
+```
+
+Results: 12 target tests passed; OpenCore shell integration passed; compile and
+whitespace checks passed.
+
+## Tahoe fail-closed fixture update
+
+`Raphaeli/Kernel/Accel/upstream/SOURCE.lock` remains authoritative with
+`tahoe_target_validated=no`. Target-resolution coverage now explicitly asserts
+Tahoe rejection for both the explicit selector and macOS 26 system-root
+selection. Successful `--add`, metadata-stamping, transactional rollback, and
+status fixtures select Sequoia, so those tests exercise action success without
+fabricating Tahoe validation.
+
+Validation also covered target, OpenCore, Recovery, package, and source test
+suites; Python compilation, Bash syntax, and `git diff --check` passed.
+
 ## Files
 
 - `xkpi/oc-install.py` (new, portable core)
@@ -86,3 +125,29 @@ PASSED. `python3 -m py_compile oc-install.py` clean.
 - `xkpi/oc-install.test.sh` (new)
 
 `install.sh` and kext sources untouched.
+
+## Task 2 fix round 1
+
+Reviewer findings addressed:
+
+- `--add` now stamps the selected bundle's staged `Contents/Info.plist` with
+  `SelectedTarget` and supplies `CFBundleName=Raphaeli` when absent. The source
+  bundle remains unchanged; target selection and kernel bounds still come from
+  the production resolver and `Kernel>Add` entry.
+- Duplicate `Kernel>Add` entries for `Raphaeli.kext` are handled deterministically:
+  the first entry is retained and refreshed, later matching entries are removed
+  in reverse index order. Unrelated entries remain in their original order.
+- Target fixtures now start without `SelectedTarget`, proving production
+  staging—not fixture setup—creates the metadata.
+
+Validation:
+
+```sh
+python3 -m unittest scripts/tests/oc_install_target_test.py
+./scripts/oc-install.test.sh
+python3 -m py_compile scripts/oc-install.py scripts/tests/oc_install_target_test.py
+git diff --check
+```
+
+Results: 11 target tests passed; OpenCore shell integration passed; compile and
+whitespace checks passed.

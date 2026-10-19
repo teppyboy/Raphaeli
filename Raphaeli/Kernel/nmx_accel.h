@@ -17,20 +17,38 @@
 
 #define ACCELLOG(fmt, ...) IOLog("Raphaeli accel: " fmt "\n", ##__VA_ARGS__)
 
-/* the family, reconstructed (vtable order + sizes verified against the shipped binary by the reference driver) */
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/re/IOGraphicsAccelerator2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelEventMachineFast2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacyDisplayMachine.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelTask.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelMemoryMap.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelResource2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelSysMemory.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVidMemory.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelLegacySurface.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelGLContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccel2DContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelCLContext2.h"
-#include "../../research/nvidia-macos-driver/kexts/NVRM/accel/iofam/IOAccelVideoContext2.h"
+/* Tahoe changed private IOAcceleratorFamily2 method visibility and several types.
+ * The forwarding header is generated into the target object tree by
+ * scripts/prepare-accel-sources.py. Never fall back to an ignored research tree
+ * or claim the unvalidated 26.7.1 ABI for the audited 26.6.2 target. */
+/* These reconstructed declarations remain the common base ABI. Tahoe's upstream forwarding layer only
+ * supplies the private inherited slots that no longer have linkable symbols; it does not replace the class
+ * declarations or vtable order. */
+#include "Accel/upstream/re/IOGraphicsAccelerator2.h"
+#include "Accel/upstream/iofam/IOAccelEventMachineFast2.h"
+#include "Accel/upstream/iofam/IOAccelLegacyDisplayMachine.h"
+#include "Accel/upstream/iofam/IOAccelTask.h"
+#include "Accel/upstream/iofam/IOAccelMemoryMap.h"
+#include "Accel/upstream/iofam/IOAccelResource2.h"
+#include "Accel/upstream/iofam/IOAccelSysMemory.h"
+#include "Accel/upstream/iofam/IOAccelVidMemory.h"
+#include "Accel/upstream/iofam/IOAccelLegacySurface.h"
+#include "Accel/upstream/iofam/IOAccelGLContext2.h"
+#include "Accel/upstream/iofam/IOAccel2DContext2.h"
+#include "Accel/upstream/iofam/IOAccelCLContext2.h"
+#include "Accel/upstream/iofam/IOAccelVideoContext2.h"
+#if defined(NM_TAHOE)
+# if defined(__has_include)
+#  if __has_include("nmx_accel_tahoe_forwarding.h")
+#   include "nmx_accel_tahoe_forwarding.h"
+#  else
+#   error "NM_TAHOE requires generated nmx_accel_tahoe_forwarding.h"
+#  endif
+# else
+#  error "NM_TAHOE requires generated Tahoe accelerator forwarding headers"
+# endif
+# include "Accel/upstream/iofam/IOAccelLegacyDisplayPipe.h"
+#endif
 
 /*
  * The accel submit hooks of the lane contract (v1): the family-side surface every accel-side submit goes
@@ -46,6 +64,9 @@ kern_return_t nmx_xnu_accel_fence_wait(uint64_t fence, uint32_t timeout_ms);
 /* nmx_accel.cpp — the accelerator nub */
 class RaphaeliAccel : public IOGraphicsAccelerator2 {
     OSDeclareDefaultStructors(RaphaeliAccel)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliAccel)
+#endif
 public:
     static RaphaeliAccel *gAccel;
     IOBufferMemoryDescriptor *fStamps = nullptr;
@@ -62,6 +83,9 @@ public:
     bool      configureDevice(IOPCIDevice *pci) APPLE_KEXT_OVERRIDE;
     void      teardownDevice(IOPCIDevice *pci) APPLE_KEXT_OVERRIDE;
     OSObject *newDisplayMachine() APPLE_KEXT_OVERRIDE;
+#if defined(NM_TAHOE)
+    OSObject *newDisplayPipe() APPLE_KEXT_OVERRIDE;
+#endif
     OSObject *newGLContext() APPLE_KEXT_OVERRIDE;
     OSObject *newCLContext() APPLE_KEXT_OVERRIDE;
     OSObject *newSurface() APPLE_KEXT_OVERRIDE;
@@ -79,6 +103,9 @@ public:
 /* nmx_accel_uc.cpp — the objects the family's factories ask for */
 class RaphaeliEventMachine : public IOAccelEventMachineFast2 {
     OSDeclareDefaultStructors(RaphaeliEventMachine)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliEventMachine)
+#endif
 public:
     void writeStamp(int stamp, vendevtCommandRec *, unsigned int value) APPLE_KEXT_OVERRIDE;
     void prepareBarrier(vendevtBarrierRec *) APPLE_KEXT_OVERRIDE;
@@ -90,18 +117,27 @@ public:
 };
 class RaphaeliDisplayMachine : public IOAccelLegacyDisplayMachine {
     OSDeclareDefaultStructors(RaphaeliDisplayMachine)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliDisplayMachine)
+#endif
 public:
     bool displayModeWillChange() APPLE_KEXT_OVERRIDE;
     bool displayModeDidChange() APPLE_KEXT_OVERRIDE;
 };
 class RaphaeliTask : public IOAccelTask {
     OSDeclareDefaultStructors(RaphaeliTask)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliTask)
+#endif
     /* no vendor overrides: the family's own IOAccelTask (init/allocate/freeAllGPUMappings) does the
        task accounting from the IORangeAllocator** RaphaeliAccel hands it; GPU VM stays refused in the
        map (no page tables yet) */
 };
 class RaphaeliMemoryMap : public IOAccelMemoryMap {
     OSDeclareDefaultStructors(RaphaeliMemoryMap)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliMemoryMap)
+#endif
 public:
     bool commitIntoGPUPageTable() APPLE_KEXT_OVERRIDE;
     void releaseFromGPUPageTable() APPLE_KEXT_OVERRIDE;
@@ -109,6 +145,9 @@ public:
 };
 class RaphaeliResource : public IOAccelResource2 {
     OSDeclareDefaultStructors(RaphaeliResource)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliResource)
+#endif
 public:
     void rebuildPagingBuffer() APPLE_KEXT_OVERRIDE;
     uint64_t getLevelOffset(unsigned char, unsigned char, int *) APPLE_KEXT_OVERRIDE;
@@ -120,9 +159,15 @@ public:
 };
 class RaphaeliSysMemory : public IOAccelSysMemory {
     OSDeclareDefaultStructors(RaphaeliSysMemory)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliSysMemory)
+#endif
 };
 class RaphaeliVidMemory : public IOAccelVidMemory {
     OSDeclareDefaultStructors(RaphaeliVidMemory)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliVidMemory)
+#endif
 public:
     bool allocPhysical() APPLE_KEXT_OVERRIDE;
     void deallocPhysical() APPLE_KEXT_OVERRIDE;
@@ -133,6 +178,9 @@ public:
 };
 class RaphaeliSurface : public IOAccelLegacySurface {
     OSDeclareDefaultStructors(RaphaeliSurface)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliSurface)
+#endif
 public:
     void setSyncCommand(unsigned int *, unsigned int &, unsigned int &, _AMDSurfaceSwapSyncOptions const &) const APPLE_KEXT_OVERRIDE;
     void _pure335() APPLE_KEXT_OVERRIDE;
@@ -142,8 +190,17 @@ public:
     void shapeSurface(unsigned int, unsigned short, unsigned short) APPLE_KEXT_OVERRIDE;
     uint32_t getDirtyBufferBitsFromPrivateModeBits(unsigned long long) APPLE_KEXT_OVERRIDE;
 };
+#if defined(NM_TAHOE)
+class RaphaeliDisplayPipe : public IOAccelLegacyDisplayPipe {
+    OSDeclareDefaultStructors(RaphaeliDisplayPipe)
+    NM_TAHOE_FWD(RaphaeliDisplayPipe)
+};
+#endif
 class RaphaeliGLContext : public IOAccelGLContext2 {
     OSDeclareDefaultStructors(RaphaeliGLContext)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliGLContext)
+#endif
 public:
     void _pure362() APPLE_KEXT_OVERRIDE;
     void _pure363() APPLE_KEXT_OVERRIDE;
@@ -152,15 +209,24 @@ public:
 };
 class Raphaeli2DContext : public IOAccel2DContext2 {
     OSDeclareDefaultStructors(Raphaeli2DContext)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(Raphaeli2DContext)
+#endif
 public:
     void _pure362() APPLE_KEXT_OVERRIDE;
     void _pure363() APPLE_KEXT_OVERRIDE;
 };
 class RaphaeliCLContext : public IOAccelCLContext2 {
     OSDeclareDefaultStructors(RaphaeliCLContext)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliCLContext)
+#endif
 };
 class RaphaeliVideoContext : public IOAccelVideoContext2 {
     OSDeclareDefaultStructors(RaphaeliVideoContext)
+#if defined(NM_TAHOE)
+    NM_TAHOE_FWD(RaphaeliVideoContext)
+#endif
 };
 
 #endif /* NMX_ACCEL_H */

@@ -19,8 +19,9 @@
 #     raphaeli-amd=1 and the raphaeli-gpu-attaching boot-guard marker
 #
 # Usage:
-#   recovery-install.sh [/Volumes/Macintosh\ HD] [--apply] [--dry-run]
+#   recovery-install.sh [/Volumes/Macintosh\ HD] [--target sequoia|tahoe] [--apply] [--dry-run]
 #   recovery-install.sh /Volumes/Macintosh\ HD --uninstall
+#   RAPHAELI_KEXT=/path/to/Raphaeli.kext recovery-install.sh /Volumes/Macintosh\ HD
 #
 # Boot guard (Raphaeli/Kernel/nmx_kext.cpp): between attach start and hand-over
 # the kext sets the NVRAM marker raphaeli-gpu-attaching; if the marker is still
@@ -29,17 +30,19 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# dist zip layout: tools/recovery-install.sh next to kext/, usr/lib/, firmware/
-# dev tree fallback: out/Raphaeli.kext + out/usr/lib + firmware/amdgpu
-if [[ -d $SCRIPT_DIR/../kext ]]; then
-  SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+# dist zip layout: tools/recovery-install.sh next to target/, usr/lib/, firmware/
+# dev tree fallback: out/target/<OS>/Raphaeli.kext + out/usr/lib + firmware/amdgpu
+SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+if [[ -d $SRC_ROOT/target ]]; then
+  # Presence of target/ identifies a package even when a required tools/fw
+  # input is missing; do not silently fall back to the checkout's stage.sh.
+  PACKAGED=1
   FW_STAGE_SH=$SCRIPT_DIR/fw/stage.sh
 else
-  SRC_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)   # repo root: out/ + firmware/
+  PACKAGED=0
   FW_STAGE_SH=$SRC_ROOT/Raphaeli/Firmware/stage.sh
 fi
-KEXT_SRC=${RAPHAELI_KEXT:-$SRC_ROOT/kext/Raphaeli.kext}
-[[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+KEXT_SRC=${RAPHAELI_KEXT:-}
 USR_LIB_SRC=$SRC_ROOT/usr/lib
 [[ -d $USR_LIB_SRC ]] || USR_LIB_SRC=$SRC_ROOT/out/usr/lib
 FW_SRC=${RAPHAELI_FW_SRC:-$SRC_ROOT/firmware/amdgpu}
@@ -51,28 +54,16 @@ ICD_DEST_REL="usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json"
 ICD_LIBRARY_PATH="/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
 
 # fw/README.md + fw/stage.sh: exactly the names amdgpu passes to request_firmware()
-REQUIRED_FW=(
-  ip_discovery.bin
-  gc_11_0_1_pfp.bin
-  gc_11_0_1_me.bin
-  gc_11_0_1_rlc.bin
-  gc_11_0_1_mec.bin
-  gc_11_0_1_imu.bin
-  gc_11_0_1_mes1.bin
-  sdma_6_0_2.bin
-  psp_13_0_11_toc.bin
-  psp_13_0_11_ta.bin
-  vcn_4_0_2.bin
-  dcn_3_1_4_dmcub.bin
-)
+REQUIRED_FW="gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin gc_11_0_1_mec.bin gc_11_0_1_imu.bin gc_11_0_1_mes1.bin sdma_6_0_2.bin psp_13_0_11_toc.bin psp_13_0_11_ta.bin vcn_4_0_2.bin dcn_3_1_4_dmcub.bin"
 
 DRY_RUN=0
 APPLY=0
 UNINSTALL=0
 VOL=""
+TARGET_SELECTOR=""
 
 usage() {
-  echo "usage: recovery-install.sh /Volumes/Macintosh\\ HD [--apply] [--uninstall] [--dry-run]"
+  echo "usage: recovery-install.sh /Volumes/Macintosh\\ HD [--target sequoia|tahoe] [--apply] [--uninstall] [--dry-run]"
 }
 
 die() { echo "recovery-install.sh: $*" >&2; exit 1; }
@@ -89,6 +80,135 @@ run() {
   fi
 }
 
+# Apply filesystem changes as one transaction. Every destination is staged in a
+# sibling path, then the live path is moved aside before the staged path is
+# published. The event log lets EXIT rollback restore every earlier move.
+TX_ACTIVE=0
+TX_ROOT=""
+TX_EVENTS=""
+TX_PATHS=""
+TX_DIRS=""
+
+transaction_rollback() {
+  local line action first second
+  [[ $TX_ACTIVE == 1 ]] || return 0
+  set +e
+  if [[ -f $TX_EVENTS ]]; then
+    while IFS= read -r line; do
+      action=${line%%$'\t'*}
+      first=${line#*$'\t'}
+      second=${first#*$'\t'}
+      first=${first%%$'\t'*}
+      case "$action" in
+        install) rm -rf "$first" ;;
+        backup) [[ -e $second || -L $second ]] && mv "$second" "$first" ;;
+      esac
+    done <<EOF
+$(awk '{ lines[NR]=$0 } END { for (i=NR; i>0; i--) print lines[i] }' "$TX_EVENTS" 2>/dev/null)
+EOF
+  fi
+  if [[ -f $TX_PATHS ]]; then
+    while IFS=$'\t' read -r first second; do
+      rm -rf "$first" "$second"
+    done < "$TX_PATHS"
+  fi
+  if [[ -f $TX_DIRS ]]; then
+    while IFS= read -r first; do
+      rmdir "$first" 2>/dev/null || true
+    done <<EOF
+$(awk '{ lines[NR]=$0 } END { for (i=NR; i>0; i--) print lines[i] }' "$TX_DIRS" 2>/dev/null)
+EOF
+  fi
+  [[ -n $TX_ROOT ]] && rm -rf "$TX_ROOT"
+  TX_ACTIVE=0
+}
+
+transaction_finish() {
+  [[ $TX_ACTIVE == 1 ]] || return 0
+  set +e
+  if [[ -f $TX_PATHS ]]; then
+    while IFS=$'\t' read -r first second; do
+      rm -rf "$first" "$second"
+    done < "$TX_PATHS"
+  fi
+  rm -rf "$TX_ROOT"
+  TX_ACTIVE=0
+}
+
+trap transaction_rollback EXIT
+
+transaction_begin() {
+  TX_ROOT=$VOL/.raphaeli-transaction.$$
+  mkdir "$TX_ROOT"
+  TX_EVENTS=$TX_ROOT/events
+  TX_PATHS=$TX_ROOT/paths
+  TX_DIRS=$TX_ROOT/dirs
+  : > "$TX_EVENTS"
+  : > "$TX_PATHS"
+  : > "$TX_DIRS"
+  TX_ACTIVE=1
+}
+
+transaction_prepare_dir() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+  mkdir "$stage"
+}
+
+transaction_prepare_file() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+  : > "$stage"
+}
+
+transaction_prepare_output() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$
+  [[ ! -e $stage && ! -e $backup ]] || die "transaction paths already exist beside $dest"
+  transaction_ensure_parent "$stage"
+  printf '%s\t%s\n' "$stage" "$backup" >> "$TX_PATHS"
+}
+
+transaction_ensure_parent() {
+  local dest=$1 parent=$1 missing="" first rest
+  parent=$(dirname "$dest")
+  while [[ ! -d $parent ]]; do
+    missing="$parent
+$missing"
+    parent=$(dirname "$parent")
+  done
+  while [[ -n $missing ]]; do
+    first=${missing%%$'\n'*}
+    if [[ $missing == *$'\n'* ]]; then
+      rest=${missing#*$'\n'}
+    else
+      rest=""
+    fi
+    mkdir "$first"
+    printf '%s\n' "$first" >> "$TX_DIRS"
+    missing=$rest
+  done
+}
+
+transaction_commit() {
+  local dest=$1 stage=$1.raphaeli-staging.$$ backup=$1.raphaeli-backup.$$ moved_old=0
+  transaction_ensure_parent "$dest"
+  if [[ -e $dest || -L $dest ]]; then
+    mv "$dest" "$backup" || return 1
+    moved_old=1
+    printf 'backup\t%s\t%s\n' "$dest" "$backup" >> "$TX_EVENTS"
+  fi
+  if mv "$stage" "$dest"; then
+    printf 'install\t%s\t%s\n' "$dest" "$stage" >> "$TX_EVENTS"
+  else
+    [[ $moved_old == 1 ]] && mv "$backup" "$dest"
+    return 1
+  fi
+}
+
 # ---- argument parsing -------------------------------------------------------
 
 while (($#)); do
@@ -96,6 +216,24 @@ while (($#)); do
     --dry-run) DRY_RUN=1 ;;
     --apply) APPLY=1 ;;
     --uninstall) UNINSTALL=1 ;;
+    --target)
+      shift
+      [[ $# -gt 0 ]] || die "--target requires sequoia or tahoe"
+      [[ -z $TARGET_SELECTOR ]] || die "--target specified more than once"
+      TARGET_SELECTOR=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+      case "$TARGET_SELECTOR" in
+        sequoia|tahoe) ;;
+        *) die "unsupported target '$1' (use sequoia or tahoe)" ;;
+      esac
+      ;;
+    --target=*)
+      [[ -z $TARGET_SELECTOR ]] || die "--target specified more than once"
+      TARGET_SELECTOR=$(printf '%s' "${1#--target=}" | tr '[:upper:]' '[:lower:]')
+      case "$TARGET_SELECTOR" in
+        sequoia|tahoe) ;;
+        *) die "unsupported target '${1#--target=}' (use sequoia or tahoe)" ;;
+      esac
+      ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown option: $1"; usage >&2 ;;
     *)
@@ -105,6 +243,34 @@ while (($#)); do
   esac
   shift
 done
+
+# Resolve the selected bundle after parsing so --target may appear anywhere.
+# RAPHAELI_KEXT changes only the source; packaged installs still require a target.
+if [[ $PACKAGED -eq 1 && -z $TARGET_SELECTOR ]]; then
+  die "packaged installs require --target sequoia or --target tahoe"
+fi
+if [[ -n $TARGET_SELECTOR ]]; then
+  PREFLIGHT=$SRC_ROOT/tools/target-preflight.sh
+  [[ -x $PREFLIGHT ]] || PREFLIGHT=$SRC_ROOT/scripts/target-preflight.sh
+  LOCK=$SRC_ROOT/tools/SOURCE.lock
+  [[ -f $LOCK ]] || LOCK=$SRC_ROOT/Raphaeli/Kernel/Accel/upstream/SOURCE.lock
+  [[ -x $PREFLIGHT ]] || die "target preflight helper not found"
+  "$PREFLIGHT" "$TARGET_SELECTOR" "$LOCK" || die "$TARGET_SELECTOR target is not validated"
+fi
+if [[ -z $KEXT_SRC ]]; then
+  if [[ -n $TARGET_SELECTOR ]]; then
+    KEXT_SRC=$SRC_ROOT/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
+    if [[ ! -d $KEXT_SRC && $PACKAGED -eq 0 ]]; then
+      KEXT_SRC=$SRC_ROOT/out/target/$([[ $TARGET_SELECTOR == sequoia ]] && echo Sequoia || echo Tahoe)/Raphaeli.kext
+      [[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+    fi
+  elif [[ $PACKAGED -eq 0 ]]; then
+    KEXT_SRC=$SRC_ROOT/kext/Raphaeli.kext
+    [[ -d $KEXT_SRC ]] || KEXT_SRC=$SRC_ROOT/out/Raphaeli.kext
+  else
+    die "packaged installs require --target sequoia or --target tahoe"
+  fi
+fi
 
 # ---- volume resolution ------------------------------------------------------
 
@@ -117,23 +283,23 @@ resolve_volume() {
     return
   fi
   local volsdir=${RAPHAELI_VOLUMES_DIR:-/Volumes}
-  local pref=() other=() d
+  pref=""; other=""; pref_count=0; other_count=0
   for d in "$volsdir"/*; do
     [[ -d $d ]] || continue
     if [[ -d $d/Library/Extensions ]]; then
-      pref+=("$d")
+      pref="$pref\n$d"; pref_count=$((pref_count + 1))
     elif [[ -d $d/Library ]]; then
-      other+=("$d")
+      other="$other\n$d"; other_count=$((other_count + 1))
     fi
   done
-  if ((${#pref[@]} == 1)); then
-    VOL=${pref[0]}
-  elif ((${#pref[@]} == 0 && ${#other[@]} == 1)); then
-    VOL=${other[0]}
+  if [[ $pref_count == 1 ]]; then
+    VOL=$(printf '%b\n' "$pref" | sed -n '2p')
+  elif [[ $pref_count == 0 && $other_count == 1 ]]; then
+    VOL=$(printf '%b\n' "$other" | sed -n '2p')
   else
     echo "candidates under $volsdir:" >&2
-    ((${#pref[@]})) && printf '  %s (has Library/Extensions)\n' "${pref[@]}" >&2
-    ((${#other[@]})) && printf '  %s\n' "${other[@]}" >&2
+    [[ $pref_count != 0 ]] && printf '%b\n' "$pref" | sed '1d;s|^|  |;s|$| (has Library/Extensions)|' >&2
+    [[ $other_count != 0 ]] && printf '%b\n' "$other" | sed '1d;s|^|  |' >&2
     usage >&2
     die "could not pick a unique target volume; pass it explicitly"
   fi
@@ -171,16 +337,19 @@ log "dist source root: $SRC_ROOT"
 plutil -lint "$KEXT_SRC/Contents/Info.plist" >/dev/null || die "Info.plist does not lint: $KEXT_SRC"
 bundle_id=$(plutil -extract CFBundleIdentifier raw "$KEXT_SRC/Contents/Info.plist")
 [[ $bundle_id == "$KEXT_ID" ]] || die "unexpected bundle id '$bundle_id' (expected $KEXT_ID)"
-[[ -f $USR_LIB_SRC/libvulkan_radeon.dylib ]] || die "missing $USR_LIB_SRC/libvulkan_radeon.dylib (dist zip usr/lib/)"
-
-log "firmware census in $FW_SRC (required: ${#REQUIRED_FW[@]})"
-missing=()
-for f in "${REQUIRED_FW[@]}"; do
-  [[ -f $FW_SRC/$f ]] || missing+=("$f")
+for userspace_file in libdrm.2.dylib libdrm_amdgpu.1.dylib libvulkan_radeon.dylib; do
+  [[ -f $USR_LIB_SRC/$userspace_file ]] || die "missing $USR_LIB_SRC/$userspace_file (dist zip usr/lib/)"
 done
-if ((${#missing[@]})); then
+
+log "selected kext: $KEXT_SRC${TARGET_SELECTOR:+ (target $TARGET_SELECTOR)}"
+log "firmware census in $FW_SRC (required blobs)"
+missing=""
+for f in $REQUIRED_FW; do
+  [[ -f $FW_SRC/$f ]] || missing="$missing $f"
+done
+if [[ -n $missing ]]; then
   echo "MISSING REQUIRED firmware blobs:" >&2
-  for f in "${missing[@]}"; do echo "  amdgpu/$f" >&2; done
+  for f in $missing; do echo "  amdgpu/$f" >&2; done
   die "the dist zip should contain firmware/amdgpu/*.bin"
 fi
 
@@ -197,6 +366,7 @@ fi
 
 if (( ! DRY_RUN )); then
   mount -uw "$VOL" 2>/dev/null || true   # ignored if already rw (or read-only snapshot)
+  transaction_begin
 else
   echo "DRY-RUN: mount -uw $VOL"
 fi
@@ -205,8 +375,14 @@ fi
 
 LIB_DEST=$VOL/Library/Raphaeli/usr/lib
 log "installing dylibs -> $LIB_DEST"
-run mkdir -p "$LIB_DEST"
-run cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST"/
+if (( DRY_RUN )); then
+  run mkdir -p "$LIB_DEST"
+  run cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST"/
+else
+  transaction_prepare_dir "$LIB_DEST"
+  cp -f "$USR_LIB_SRC"/*.dylib "$LIB_DEST.raphaeli-staging.$$"/
+  transaction_commit "$LIB_DEST"
+fi
 
 # Vulkan ICD json: absolute library_path, loader default-scans
 # /usr/local/share/vulkan/icd.d (on the Data volume, writable).
@@ -217,7 +393,9 @@ icd_body=$'{\n  "file_format_version": "1.0.0",\n  "ICD": {\n    "library_path":
 if (( DRY_RUN )); then
   echo "DRY-RUN: write $ICD_DEST (library_path=$ICD_LIBRARY_PATH)"
 else
-  printf '%s' "$icd_body" > "$ICD_DEST"
+  transaction_prepare_file "$ICD_DEST"
+  printf '%s' "$icd_body" > "$ICD_DEST.raphaeli-staging.$$"
+  transaction_commit "$ICD_DEST"
 fi
 
 # ---- firmware ----------------------------------------------------------------
@@ -225,7 +403,13 @@ fi
 FW_DEST=$VOL/Library/Raphaeli/firmware
 log "staging firmware -> $FW_DEST (stage.sh)"
 [[ -f $FW_STAGE_SH ]] || die "stage.sh not found at $FW_STAGE_SH"
-run sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST"
+if (( DRY_RUN )); then
+  run sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST"
+else
+  transaction_prepare_dir "$FW_DEST"
+  sh "$FW_STAGE_SH" "$FW_SRC" "$FW_DEST.raphaeli-staging.$$" || die "firmware staging failed"
+  transaction_commit "$FW_DEST"
+fi
 
 # ---- kext: OC-detect or direct copy + auxKC ----------------------------------
 
@@ -238,10 +422,18 @@ if [[ -f $VOL/EFI/OC/config.plist ]]; then
 else
   KEXT_DEST=$VOL/Library/Extensions/Raphaeli.kext
   log "installing kext -> $KEXT_DEST (root:wheel, 755)"
-  run rm -rf "$KEXT_DEST"
-  run ditto "$KEXT_SRC" "$KEXT_DEST"
-  run chown -R root:wheel "$KEXT_DEST" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
-  run chmod -R 755 "$KEXT_DEST"
+  if (( DRY_RUN )); then
+    run rm -rf "$KEXT_DEST"
+    run ditto "$KEXT_SRC" "$KEXT_DEST"
+    run chown -R root:wheel "$KEXT_DEST" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
+    run chmod -R 755 "$KEXT_DEST"
+  else
+    transaction_prepare_dir "$KEXT_DEST"
+    ditto "$KEXT_SRC" "$KEXT_DEST.raphaeli-staging.$$"
+    chown -R root:wheel "$KEXT_DEST.raphaeli-staging.$$" || log "WARNING: chown failed (not root?); kext must be root:wheel to load"
+    chmod -R 755 "$KEXT_DEST.raphaeli-staging.$$"
+    transaction_commit "$KEXT_DEST"
+  fi
 
   # auxKC: best effort. kmutil exists in recent RecoveryOS; needs a matching KDK
   # and the target volume's kernel collections.
@@ -255,15 +447,28 @@ else
     done
     if [[ -n $kdk ]]; then
       log "building aux KC (kmutil, KDK: $(basename "$kdk"))"
-      run mkdir -p "$VOL/Library/KernelCollections"
-      run kmutil create \
-        -a x86_64 -n aux -x \
-        -p "$KEXT_DEST" \
-        --no-authentication \
-        -A "$VOL/Library/KernelCollections/Raphaeli.auxkc" \
-        -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
-        -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
-        --kdk "$kdk" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      AUXKC_DEST=$VOL/Library/KernelCollections/Raphaeli.auxkc
+      if (( DRY_RUN )); then
+        run mkdir -p "$VOL/Library/KernelCollections"
+        run kmutil create \
+          -a x86_64 -n aux -x \
+          -p "$KEXT_DEST" \
+          --no-authentication \
+          -A "$AUXKC_DEST" \
+          -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
+          -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
+          --kdk "$kdk" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      else
+        transaction_prepare_output "$AUXKC_DEST"
+        kmutil create \
+          -a x86_64 -n aux -x \
+          -p "$KEXT_DEST" \
+          --no-authentication \
+          -A "$AUXKC_DEST.raphaeli-staging.$$" \
+          -B "$VOL/System/Library/KernelCollections/BootKernelExtensions.kc" \
+          -S "$VOL/System/Library/KernelCollections/SystemKernelExtensions.kc" \
+          --kdk "$kdk" && transaction_commit "$AUXKC_DEST" || log "WARNING: kmutil create failed; build the auxKC from the booted system"
+      fi
     else
       log "no matching KDK under $VOL/Library/Developer/KDKs (target build ${tgt_build:-?}); skipping auxKC"
     fi
@@ -291,6 +496,12 @@ if (( APPLY )); then
   echo "  nvram -d boot-args         # full reset (only if no other boot-args were set)"
 else
   log "not applying boot-args (pass --apply to add $BOOT_ARG)"
+fi
+
+# Publish staged filesystem changes only after every install step succeeds,
+# including the optional boot-arg write.
+if (( ! DRY_RUN )); then
+  transaction_finish
 fi
 
 # ---- next steps ----------------------------------------------------------------

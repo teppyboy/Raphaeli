@@ -26,15 +26,15 @@ Usage:
                 positional also accepted)
   --firmware-src dir with linux-firmware amdgpu blobs; stage via fw/stage.sh
                 onto <system-root>/Library/Raphaeli/firmware
-  --kext-src    Raphaeli.kext to copy (default: out/Raphaeli.kext next to
-                this script)
+  --kext-src    single Raphaeli.kext bundle to copy (explicit override)
+  --target      target macOS variant: sequoia or tahoe
 
 Linux path (no macOS needed):
   python3 oc-install.py /media/user/EFI --add
   python3 oc-install.py /dev/sda1 --status --system-root /mnt/target
 
---add       backup config.plist, copy the kext into EFI/OC/Kexts/, insert a
-            Kernel>Add entry (Enabled true, MinKernel 23.4.0). Adds NO
+--add       backup config.plist, copy the selected kext into EFI/OC/Kexts/,
+            insert or update a Kernel>Add entry. Adds NO
             boot-arg: the kext loads but stays inert until --enable.
 --enable    append raphaeli-amd=1 to NVRAM>Add>7C43...:boot-args (idempotent)
 --disable   strip raphaeli-amd=1 from boot-args (kext loads but parks)
@@ -51,7 +51,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
-from typing import Any, NoReturn
+from typing import Any, NamedTuple, NoReturn
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # stage.sh lives next to us in the dist zip (tools/fw/stage.sh) or in the dev
@@ -70,18 +70,86 @@ VOL = ""
 CONFIG = ""
 KEXTS_DIR = ""
 SYS_ROOT = "/"
+SYSTEM_ROOT_SET = False
 FW_SRC = ""
-# kext source: dist zip layout (kext/ next to tools/), then dev-tree layout
-# (out/Raphaeli.kext at the repo root). Override: --kext-src
-# or $RAPHAELI_KEXT.
-def _default_kext_src():
-    for cand in (os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME),
-                 os.path.join(SCRIPT_DIR, "..", "out", KEXT_NAME)):
-        if os.path.isdir(cand):
-            return os.path.normpath(cand)
-    return os.path.join(SCRIPT_DIR, "..", "kext", KEXT_NAME)
+TARGET_SELECTOR = ""
+KEXT_SRC_EXPLICIT = bool(os.environ.get("RAPHAELI_KEXT"))
+# Optional source override. Target selection remains mandatory so every injected
+# entry receives a real Darwin 24.x or 25.x kernel bound.
+KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or ""
 
-KEXT_SRC = os.environ.get("RAPHAELI_KEXT") or _default_kext_src()
+class TargetInfo(NamedTuple):
+    name: str
+    source_bundle: str
+    min_kernel: str
+    max_kernel: str
+
+TARGETS = {
+    "sequoia": ("Sequoia", "24.0.0", "24.99.99"),
+    "tahoe": ("Tahoe", "25.0.0", "25.99.99"),
+}
+APPROVED_SOURCE_METADATA = {
+    "repository": "https://github.com/nullmoth/nvidia-macos-driver.git",
+    "commit": "637282334617d27bccf8aa2448497c0f19465dc8",
+    "source_path": "kexts/NVRM/accel",
+}
+
+
+def validate_target_metadata(target: str, package_root: str = "") -> None:
+    if target != "tahoe":
+        return
+    lock_candidates = (
+        os.path.join(package_root, "SOURCE.lock"),
+        os.path.join(SCRIPT_DIR, "SOURCE.lock"),
+        os.path.join(SCRIPT_DIR, "..", "Raphaeli", "Kernel", "Accel", "upstream", "SOURCE.lock"),
+    )
+    lock = next((p for p in lock_candidates if os.path.isfile(p)), "")
+    if not lock:
+        die("refusing Tahoe: SOURCE.lock is unavailable")
+    metadata = {}
+    with open(lock) as stream:
+        for line in stream:
+            if "=" in line:
+                key, value = line.rstrip("\n").split("=", 1)
+                metadata[key] = value
+    for key, expected in APPROVED_SOURCE_METADATA.items():
+        if metadata.get(key) != expected:
+            die(f"refusing Tahoe: SOURCE.lock {key} is not approved")
+    if metadata.get("tahoe_target_validated") != "yes":
+        die(f"refusing Tahoe: SOURCE.lock marks tahoe_target_validated={metadata.get('tahoe_target_validated', '')}")
+
+def resolve_target(explicit: str, system_root: str, package_root: str) -> TargetInfo:
+    selector = explicit.strip().lower()
+    if selector:
+        metadata = TARGETS.get(selector)
+        if metadata is None:
+            die(f"unsupported target {explicit!r}; use --target sequoia or --target tahoe")
+    else:
+        if not system_root:
+            die("target is required: pass --target sequoia|tahoe or --system-root <mounted system volume>")
+        version_path = os.path.join(system_root, "System", "Library", "CoreServices", "SystemVersion.plist")
+        try:
+            with open(version_path, "rb") as f:
+                version = plistlib.load(f).get("ProductVersion", "")
+        except (OSError, plistlib.InvalidFileException, ValueError) as e:
+            die(f"cannot read ProductVersion from {version_path}: {e}")
+        match = re.match(r"^(\d+)(?:\.|$)", version if isinstance(version, str) else "")
+        major = int(match.group(1)) if match else -1
+        if major == 15:
+            selector = "sequoia"
+        elif major == 26:
+            selector = "tahoe"
+        else:
+            die(f"unsupported ProductVersion {version!r}; supported versions are 15.x (Sequoia) and 26.x (Tahoe)")
+        metadata = TARGETS[selector]
+    validate_target_metadata(selector, package_root)
+    name, minimum, maximum = metadata
+    source_candidates = (
+        os.path.join(package_root, "target", name, KEXT_NAME),
+        os.path.join(package_root, "out", "target", name, KEXT_NAME),
+    )
+    source = next((p for p in source_candidates if os.path.isdir(p)), source_candidates[0])
+    return TargetInfo(name, os.path.normpath(source), minimum, maximum)
 
 
 def die(msg: str) -> NoReturn:
@@ -211,14 +279,17 @@ def validate_config() -> None:
         die(f"config.plist invalid after edit ({e}); restore from backup")
 
 
-def find_entry_index(cfg: "dict") -> "int | None":
+def find_entry_indices(cfg: "dict") -> "list[int]":
     add = cfg.get("Kernel", {}).get("Add", [])
     if not isinstance(add, list):
-        return None
-    for i, e in enumerate(add):
-        if isinstance(e, dict) and e.get("BundlePath") == KEXT_NAME:
-            return i
-    return None
+        return []
+    return [i for i, e in enumerate(add)
+            if isinstance(e, dict) and e.get("BundlePath") == KEXT_NAME]
+
+
+def find_entry_index(cfg: "dict") -> "int | None":
+    indices = find_entry_indices(cfg)
+    return indices[0] if indices else None
 
 
 def read_bootargs(cfg: "dict") -> str:
@@ -307,27 +378,62 @@ def firmware_status() -> None:
             print(f"  --firmware-src {FW_SRC} census OK ({len(REQUIRED_FW)}/{len(REQUIRED_FW)})")
 
 
-def stage_firmware() -> None:
+def stage_firmware() -> "tuple[str, str]":
+    """Stage firmware privately, then publish it as one replaceable tree.
+
+    The returned (root, old) pair remains a transaction until the caller calls
+    finish_firmware(). A later config or kext failure can therefore restore the
+    pre-existing firmware tree instead of leaving a partial install behind.
+    """
     if not FW_SRC:
-        return
+        return "", ""
     if not os.path.isdir(FW_SRC):
         die(f"--firmware-src not a directory: {FW_SRC}")
     missing = [f for f in REQUIRED_FW if not os.path.isfile(os.path.join(FW_SRC, f))]
     if missing:
         die(f"{len(missing)} required firmware blob(s) missing in {FW_SRC} (see fw/stage.sh)")
     fwroot = os.path.join(SYS_ROOT, "Library", "Raphaeli", "firmware")
+    temporary = fwroot + ".raphaeli-staging"
+    old = fwroot + ".raphaeli-old"
     log(f"staging firmware -> {fwroot}")
     if DRY_RUN:
         print("DRY-RUN: mkdir -p", fwroot)
         print("DRY-RUN: sh", FW_STAGE_SH, FW_SRC, fwroot)
-        return
+        return "", ""
+    if os.path.exists(temporary) or os.path.exists(old):
+        die(f"firmware transaction paths already exist beside {fwroot}; remove them manually")
+    moved_old = False
     try:
-        os.makedirs(fwroot, exist_ok=True)
-        r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, fwroot])
-    except OSError as e:
-        die(f"firmware staging failed: {e}")
-    if r.returncode != 0:
-        die("fw/stage.sh failed")
+        # stage.sh may copy many blobs and fail part-way through. It only ever
+        # sees the private tree, never the live firmware directory.
+        r = subprocess.run(["sh", FW_STAGE_SH, FW_SRC, temporary])
+        if r.returncode != 0:
+            die("fw/stage.sh failed")
+        if os.path.exists(fwroot):
+            os.replace(fwroot, old)
+            moved_old = True
+        os.replace(temporary, fwroot)
+    except BaseException:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        if moved_old and not os.path.exists(fwroot) and os.path.exists(old):
+            os.replace(old, fwroot)
+        raise
+    return fwroot, old if moved_old else ""
+
+def finish_firmware(state: "tuple[str, str]") -> None:
+    _root, old = state
+    if old and os.path.exists(old):
+        remove_path(old)
+
+def rollback_firmware(state: "tuple[str, str]") -> None:
+    root, old = state
+    if not root:
+        return
+    if os.path.exists(root):
+        remove_path(root)
+    if old and os.path.exists(old):
+        os.replace(old, root)
 
 
 # ---- actions -------------------------------------------------------------------
@@ -345,61 +451,220 @@ def copy_kext(src: str, dst: str) -> None:
     shutil.copytree(src, dst, symlinks=True)
 
 
+def stamp_target_metadata(bundle: str, target: TargetInfo) -> None:
+    """Stamp selected target on the staged bundle, preserving bundle identity."""
+    if not target.name:
+        return
+    info_path = os.path.join(bundle, "Contents", "Info.plist")
+    try:
+        with open(info_path, "rb") as stream:
+            info = plistlib.load(stream)
+    except (OSError, plistlib.InvalidFileException, ValueError) as e:
+        die(f"cannot read staged kext metadata {info_path}: {e}")
+    if not isinstance(info, dict):
+        die(f"staged kext metadata is not a dictionary: {info_path}")
+    info["SelectedTarget"] = target.name
+    if info.get("CFBundleName") not in (None, "Raphaeli"):
+        die(f"staged kext has unexpected CFBundleName: {info.get('CFBundleName')!r}")
+    if "CFBundleName" not in info:
+        info["CFBundleName"] = "Raphaeli"
+    tmp = info_path + ".raphaeli-tmp"
+    try:
+        with open(tmp, "wb") as stream:
+            plistlib.dump(info, stream, fmt=plistlib.FMT_XML)
+        os.replace(tmp, info_path)
+    except OSError as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        die(f"cannot stamp staged kext metadata {info_path}: {e}")
+
+
+def remove_path(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+    else:
+        os.unlink(path)
+
+def unique_backup_path(config: str, timestamp: str) -> str:
+    base = f"{config}.raphaeli-backup-{timestamp}"
+    candidate = base
+    suffix = 1
+    while os.path.exists(candidate):
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def prepare_staged_kext(source: str, staged: str, target: TargetInfo) -> str:
+    """Build a sibling bundle before changing config.plist or staged output."""
+    temporary = staged + ".raphaeli-staging"
+    try:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        copy_kext(source, temporary)
+        stamp_target_metadata(temporary, target)
+    except BaseException:
+        try:
+            if os.path.exists(temporary):
+                remove_path(temporary)
+        except OSError:
+            pass
+        raise
+    return temporary
+
+def commit_staged_kext(temporary: str, staged: str) -> str:
+    """Replace staged bundle, retaining the old copy until config commit."""
+    old = staged + ".raphaeli-old"
+    moved_old = False
+    try:
+        if os.path.exists(old):
+            remove_path(old)
+        if os.path.exists(staged):
+            os.replace(staged, old)
+            moved_old = True
+        os.replace(temporary, staged)
+    except OSError:
+        try:
+            if os.path.exists(temporary):
+                remove_path(temporary)
+            if moved_old and not os.path.exists(staged):
+                os.replace(old, staged)
+        except OSError:
+            pass
+        raise
+    return old if moved_old else ""
+
+def finish_staged_kext(old: str) -> None:
+    if old and os.path.exists(old):
+        remove_path(old)
+
+def restore_config_bytes(original: bytes) -> None:
+    tmp = CONFIG + ".raphaeli-rollback"
+    try:
+        with open(tmp, "wb") as stream:
+            stream.write(original)
+        os.replace(tmp, CONFIG)
+    except OSError as e:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        die(f"cannot roll back {CONFIG}: {e}")
+
 def action_add() -> None:
-    if not os.path.isdir(os.path.join(KEXT_SRC, "Contents")):
-        die(f"not a kext bundle: {KEXT_SRC}")
-    if not os.path.isfile(os.path.join(KEXT_SRC, "Contents", "Info.plist")):
-        die(f"kext bundle missing Contents/Info.plist: {KEXT_SRC}")
+    package_root = os.path.dirname(SCRIPT_DIR)
+    target = resolve_target(TARGET_SELECTOR, SYS_ROOT if SYSTEM_ROOT_SET else "", package_root)
+    source = KEXT_SRC if KEXT_SRC_EXPLICIT else target.source_bundle
+    if not os.path.isdir(os.path.join(source, "Contents")):
+        die(f"not a kext bundle: {source}")
+    if not os.path.isfile(os.path.join(source, "Contents", "Info.plist")):
+        die(f"kext bundle missing Contents/Info.plist: {source}")
     cfg = load_config()
-    idx = find_entry_index(cfg)
+    indices = find_entry_indices(cfg)
+    idx = indices[0] if indices else None
+    # Reject disabled existing entries before staging firmware or touching EFI.
     if idx is not None:
-        log(f"config entry already present at Kernel>Add:{idx}")
-        entry = cfg["Kernel"]["Add"][idx]
-        if entry.get("Comment") != KEXT_NAME:
-            log(f"refreshing Comment -> {KEXT_NAME!r}")
-            entry["Comment"] = KEXT_NAME
-            if DRY_RUN:
-                print(f"DRY-RUN: set :Kernel:Add:{idx}:Comment = {KEXT_NAME}")
-            else:
-                save_config(cfg)
-        enabled = entry.get("Enabled")
+        enabled = cfg["Kernel"]["Add"][idx].get("Enabled")
         if enabled is not True:
             die(f"existing entry has Enabled={enabled}; fix config.plist manually")
-    else:
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup = f"{CONFIG}.raphaeli-backup-{ts}"
-        log(f"backing up config.plist -> {os.path.basename(backup)}")
-        if DRY_RUN:
+    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
+    if DRY_RUN:
+        if idx is not None:
+            log(f"config entry already present at Kernel>Add:{idx}")
+            print(f"DRY-RUN: refresh :Kernel>Add:{idx} for {target.name}")
+        else:
+            ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+            backup = unique_backup_path(CONFIG, ts)
             print("DRY-RUN: cp", CONFIG, backup)
+            print(f"DRY-RUN: append Raphaeli.kext to :Kernel:Add")
+        copy_kext(source, staged)
+        stage_firmware()
+        return
+
+    # Stage and stamp completely before touching config.plist. A failed copy or
+    # metadata write must leave an existing entry and bundle byte-for-byte intact.
+    with open(CONFIG, "rb") as stream:
+        original_config = stream.read()
+    temporary = prepare_staged_kext(source, staged, target)
+    firmware_state = ("", "")
+    try:
+        firmware_state = stage_firmware()
+    except BaseException:
+        if os.path.exists(temporary):
+            remove_path(temporary)
+        raise
+
+    # Keep a restorable original before mutating bounds, comments, duplicates,
+    # or inserting a new entry. The backup is part of the install contract.
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup = unique_backup_path(CONFIG, ts)
+    log(f"backing up config.plist -> {os.path.basename(backup)}")
+    try:
+        shutil.copy2(CONFIG, backup)
+    except OSError as e:
+        remove_path(temporary)
+        rollback_firmware(firmware_state)
+        die(f"cannot back up {CONFIG}: {e}")
+
+    changed = False
+    old = ""
+    committed = False
+    try:
+        if idx is not None:
+            log(f"config entry already present at Kernel>Add:{idx}")
+            entry = cfg["Kernel"]["Add"][idx]
+            if entry.get("Comment") != KEXT_NAME:
+                log(f"refreshing Comment -> {KEXT_NAME!r}")
+                entry["Comment"] = KEXT_NAME
+                changed = True
+            if entry.get("MinKernel") != target.min_kernel or entry.get("MaxKernel") != target.max_kernel:
+                entry["MinKernel"] = target.min_kernel
+                entry["MaxKernel"] = target.max_kernel
+                changed = True
+            if len(indices) > 1:
+                log(f"removing {len(indices) - 1} duplicate Kernel>Add entries")
+                for duplicate in reversed(indices[1:]):
+                    cfg["Kernel"]["Add"].pop(duplicate)
+                changed = True
         else:
-            shutil.copy2(CONFIG, backup)
-        kernel = cfg.setdefault("Kernel", {})
-        add = kernel.get("Add")
-        if not isinstance(add, list):
-            if add is not None:
-                die(":Kernel:Add exists but is not an array")
-            log("creating missing Kernel>Add array")
-            add = kernel["Add"] = []
-        entry = {
-            "Arch": "x86_64",
-            "BundlePath": KEXT_NAME,
-            "Comment": KEXT_NAME,
-            "Enabled": True,
-            "ExecutablePath": "Contents/MacOS/Raphaeli",
-            "MaxKernel": "",
-            "MinKernel": "23.4.0",
-            "PlistPath": "Contents/Info.plist",
-        }
-        log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
-        if DRY_RUN:
-            print(f"DRY-RUN: append {entry} to :Kernel:Add")
-        else:
+            kernel = cfg.setdefault("Kernel", {})
+            add = kernel.get("Add")
+            if not isinstance(add, list):
+                if add is not None:
+                    remove_path(temporary)
+                    die(":Kernel:Add exists but is not an array")
+                log("creating missing Kernel>Add array")
+                add = kernel["Add"] = []
+            entry = {
+                "Arch": "x86_64", "BundlePath": KEXT_NAME, "Comment": KEXT_NAME,
+                "Enabled": True, "ExecutablePath": "Contents/MacOS/Raphaeli",
+                "MaxKernel": target.max_kernel, "MinKernel": target.min_kernel,
+                "PlistPath": "Contents/Info.plist",
+            }
+            log(f"inserting Kernel>Add:{len(add)} ({KEXT_NAME}, inert until {BOOT_ARG})")
             add.append(entry)
+            changed = True
+
+        old = commit_staged_kext(temporary, staged)
+        committed = True
+        if changed:
             save_config(cfg)
-    copy_kext(KEXT_SRC, os.path.join(KEXTS_DIR, KEXT_NAME))
-    stage_firmware()
-    if not DRY_RUN:
-        validate_config()
+        finish_staged_kext(old)
+    except BaseException:
+        restore_config_bytes(original_config)
+        if committed:
+            if os.path.exists(staged):
+                remove_path(staged)
+            if old and os.path.exists(old):
+                os.replace(old, staged)
+        elif os.path.exists(temporary):
+            remove_path(temporary)
+        rollback_firmware(firmware_state)
+        raise
+    finish_firmware(firmware_state)
+    validate_config()
 
 
 def action_enable() -> None:
@@ -433,37 +698,92 @@ def action_disable() -> None:
 
 def action_remove() -> None:
     cfg = load_config()
-    idx = find_entry_index(cfg)
-    if idx is not None:
-        log(f"deleting Kernel>Add:{idx} ({KEXT_NAME})")
-        if DRY_RUN:
-            print(f"DRY-RUN: delete :Kernel:Add:{idx}")
-        else:
-            cfg["Kernel"]["Add"].pop(idx)
-            save_config(cfg)
+    indices = find_entry_indices(cfg)
+    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
+    if indices:
+        log(f"deleting {len(indices)} Kernel>Add entr{'y' if len(indices) == 1 else 'ies'} ({KEXT_NAME})")
     else:
         log(f"no Kernel>Add entry for {KEXT_NAME} (nothing to delete)")
-    staged = os.path.join(KEXTS_DIR, KEXT_NAME)
-    if os.path.exists(staged):
-        if DRY_RUN:
+    if DRY_RUN:
+        if indices:
+            print(f"DRY-RUN: delete :Kernel>Add entries {indices}")
+        if os.path.exists(staged):
             print("DRY-RUN: rm -rf", staged)
         else:
-            try:
-                shutil.rmtree(staged)
-            except OSError as e:
-                die(f"cannot remove {staged}: {e}")
-    else:
-        log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
-    log("backups (config.plist.raphaeli-backup-*) are kept")
-    if not DRY_RUN:
-        validate_config()
+            log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
+        log("backups (config.plist.raphaeli-backup-*) are kept")
+        return
 
+    with open(CONFIG, "rb") as stream:
+        original_config = stream.read()
+    kext_backup = staged + ".raphaeli-remove"
+    if os.path.exists(kext_backup):
+        die(f"remove transaction path already exists: {kext_backup}")
+    moved = False
+    try:
+        # Move the live bundle aside atomically before config commit. Keeping it
+        # in the same directory makes the removal reversible without a partial
+        # copy or delete.
+        if os.path.exists(staged):
+            os.replace(staged, kext_backup)
+            moved = True
+        else:
+            log(f"no EFI/OC/Kexts/{KEXT_NAME} staged")
+        if indices:
+            for idx in reversed(indices):
+                cfg["Kernel"]["Add"].pop(idx)
+            save_config(cfg)
+        if moved and os.path.exists(kext_backup):
+            remove_path(kext_backup)
+    except BaseException:
+        try:
+            restore_config_bytes(original_config)
+            if moved and not os.path.exists(staged) and os.path.exists(kext_backup):
+                os.replace(kext_backup, staged)
+        except BaseException:
+            raise
+        finally:
+            if os.path.exists(kext_backup):
+                remove_path(kext_backup)
+        raise
+    log("backups (config.plist.raphaeli-backup-*) are kept")
+    validate_config()
+
+
+def status_target(cfg: "dict") -> "tuple[str, str, str]":
+    """Return the selected target name and bounds without mutating the EFI."""
+    package_root = os.path.dirname(SCRIPT_DIR)
+    if TARGET_SELECTOR or SYSTEM_ROOT_SET:
+        selected = resolve_target(
+            TARGET_SELECTOR,
+            SYS_ROOT if SYSTEM_ROOT_SET else "",
+            package_root,
+        )
+        return selected.name, selected.min_kernel, selected.max_kernel
+
+    idx = find_entry_index(cfg)
+    if idx is not None:
+        entry = cfg["Kernel"]["Add"][idx]
+        minimum = entry.get("MinKernel", "")
+        maximum = entry.get("MaxKernel", "")
+        for name, target_min, target_max in TARGETS.values():
+            if minimum == target_min and maximum == target_max:
+                return name, target_min, target_max
+        if isinstance(minimum, str) and isinstance(maximum, str):
+            return "unknown", minimum, maximum
+    return "unknown", "", ""
 
 def action_status() -> None:
     cfg = load_config()
     idx = find_entry_index(cfg)
+    target_name, min_kernel, max_kernel = status_target(cfg)
     print(f"EFI volume:        {VOL}")
     print(f"config.plist:      {CONFIG}")
+    print(f"target:            {target_name}")
+    if min_kernel or max_kernel:
+        print(f"kernel bounds:     MinKernel={min_kernel}, MaxKernel={max_kernel}")
+    else:
+        print("kernel bounds:     not selected")
     if idx is not None:
         enabled = cfg["Kernel"]["Add"][idx].get("Enabled")
         print(f"config entry:      present at Kernel>Add:{idx}, Enabled={str(enabled).lower()}")
@@ -499,7 +819,8 @@ OC boot-menu safety:
 
 
 def main(argv: "list[str]") -> int:
-    global DRY_RUN, SYS_ROOT, FW_SRC, KEXT_SRC
+    global DRY_RUN, SYS_ROOT, SYSTEM_ROOT_SET, FW_SRC, KEXT_SRC
+    global TARGET_SELECTOR, KEXT_SRC_EXPLICIT
     actions = {"--add": "add", "--enable": "enable", "--disable": "disable",
                "--remove": "remove", "--status": "status"}
     action = "status"
@@ -511,7 +832,7 @@ def main(argv: "list[str]") -> int:
             action = actions[a]
         elif a == "--dry-run":
             DRY_RUN = True
-        elif a in ("--firmware-src", "--system-root", "--kext-src"):
+        elif a in ("--firmware-src", "--system-root", "--kext-src", "--target"):
             if i + 1 >= len(argv):
                 die(f"{a} needs an argument")
             val = argv[i + 1]
@@ -520,8 +841,12 @@ def main(argv: "list[str]") -> int:
                 FW_SRC = val
             elif a == "--system-root":
                 SYS_ROOT = val
+                SYSTEM_ROOT_SET = True
+            elif a == "--target":
+                TARGET_SELECTOR = val
             else:
                 KEXT_SRC = val
+                KEXT_SRC_EXPLICIT = True
         elif a in ("-h", "--help"):
             usage()
             return 0
@@ -532,6 +857,7 @@ def main(argv: "list[str]") -> int:
                 target = a
             elif SYS_ROOT == "/":
                 SYS_ROOT = a
+                SYSTEM_ROOT_SET = True
             else:
                 die(f"unexpected argument: {a}")
         i += 1

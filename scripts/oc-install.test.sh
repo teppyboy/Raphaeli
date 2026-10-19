@@ -108,13 +108,13 @@ mkfake_kext "$KEXT_SRC"
 
 echo "== test 1: --add inserts entry + stages kext + backup (via shell wrapper)"
 mkfake_efi "$EFI"
-"$OC" "$EFI" --add --kext-src "$KEXT_SRC" >/dev/null || bad "add exited nonzero"
+"$OC" "$EFI" --add --target sequoia --kext-src "$KEXT_SRC" >/dev/null || bad "add exited nonzero"
 assert_eq "add: one entry"        "1" "$(count_entries "$EFI/EFI/OC/config.plist")"
 "$PY" -c "
 import plistlib
 cfg = plistlib.load(open('$EFI/EFI/OC/config.plist','rb'))
 e = [x for x in cfg['Kernel']['Add'] if x['BundlePath']=='Raphaeli.kext'][0]
-assert e['Enabled'] is True and e['MinKernel']=='23.4.0' and e['ExecutablePath']=='Contents/MacOS/Raphaeli', e
+assert e['Enabled'] is True and e['MinKernel']=='24.0.0' and e['MaxKernel']=='24.99.99' and e['ExecutablePath']=='Contents/MacOS/Raphaeli', e
 assert cfg['Kernel']['Add'][0]['BundlePath']=='Dummy.kext'
 " && ok "add: entry fields (Enabled/MinKernel/ExecutablePath, dummy kept)" || bad "add: entry fields wrong"
 [[ -d $EFI/EFI/OC/Kexts/Raphaeli.kext/Contents/MacOS ]] && ok "add: kext staged (copytree)" || bad "add: kext not staged"
@@ -123,7 +123,7 @@ assert_eq "add: no boot-arg added" "keepsyms=1 debug=0x100" "$(bootargs "$EFI/EF
 
 echo "== test 2: --add idempotency"
 before=$(count_entries "$EFI/EFI/OC/config.plist")
-"$OC" "$EFI" --add --kext-src "$KEXT_SRC" >/dev/null || bad "re-add exited nonzero"
+"$OC" "$EFI" --add --target sequoia --kext-src "$KEXT_SRC" >/dev/null || bad "re-add exited nonzero"
 assert_eq "add idempotent: still one entry" "$before" "$(count_entries "$EFI/EFI/OC/config.plist")"
 
 echo "== test 3: --enable appends + idempotent, --disable strips"
@@ -155,16 +155,17 @@ assert_eq "remove: entry gone"    "0" "$(count_entries "$EFI/EFI/OC/config.plist
 [[ -d $EFI/EFI/OC/Kexts/Raphaeli.kext ]] && bad "remove: kext still staged" || ok "remove: kext deleted"
 ls "$EFI"/EFI/OC/config.plist.raphaeli-backup-* >/dev/null 2>&1 && ok "remove: backup kept" || bad "remove: backup gone"
 
-echo "== test 7: missing Add array case + missing target (python core direct)"
+echo "== test 7: missing Add array + explicit source still requires target"
 mkdir -p "$T/efi2/EFI/OC/Kexts"
 printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict/></plist>\n' > "$T/efi2/EFI/OC/config.plist"
-"$PYCORE" "$T/efi2" --add --kext-src "$KEXT_SRC" >/dev/null 2>&1 || bad "add (no Add array) exited nonzero"
+"$PYCORE" "$T/efi2" --add --target sequoia --kext-src "$KEXT_SRC" >/dev/null 2>&1 || bad "add (no Add array) exited nonzero"
 assert_eq "add: created Add array" "1" "$(count_entries "$T/efi2/EFI/OC/config.plist")"
+"$PYCORE" "$T/efi2" --add --kext-src "$KEXT_SRC" >/dev/null 2>&1 && bad "explicit source without target should fail" || ok "explicit source without target rejected"
 "$OC" "$T/nonexistent-volume" --status >/dev/null 2>&1 && bad "bad target should fail" || ok "bad target rejected"
 
 echo "== test 8: python core smoke cycle (direct add/enable/remove, no shell wrapper)"
 mkfake_efi "$T/efi3"
-"$PYCORE" "$T/efi3" --add --kext-src "$KEXT_SRC" >/dev/null || bad "py add exited nonzero"
+"$PYCORE" "$T/efi3" --add --target sequoia --kext-src "$KEXT_SRC" >/dev/null || bad "py add exited nonzero"
 "$PYCORE" "$T/efi3" --enable >/dev/null || bad "py enable exited nonzero"
 assert_eq "py: boot-args after enable" "keepsyms=1 debug=0x100 raphaeli-amd=1" "$(bootargs "$T/efi3/EFI/OC/config.plist")"
 "$PYCORE" "$T/efi3" --remove >/dev/null || bad "py remove exited nonzero"

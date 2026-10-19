@@ -34,8 +34,8 @@ from macOS Recovery") and covered by `scripts/recovery-install.test.sh`
 4. **Kext + firmware** — `ditto` to `<vol>/Library/Extensions/Raphaeli.kext`,
    `chown -R root:wheel`, `chmod -R 755`; firmware staged via the dist's
    `tools/fw/stage.sh` into `<vol>/Library/Raphaeli/firmware/amdgpu/`, after a
-   census against the 12 required `request_firmware()` names and optional
-   `SHA256SUMS` verification via `shasum -a 256 -c` (skipped if the package
+   census against the 11 required `request_firmware()` names plus optional
+   firmware and optional `SHA256SUMS` verification via `shasum -a 256 -c` (skipped if the package
    ships no manifest).
 5. **Boot-args + boot guard** — mirrors install.sh exactly: `raphaeli-amd=1`
    appended to `nvram boot-args` only with `--apply` (idempotent, preserves
@@ -53,24 +53,33 @@ from macOS Recovery") and covered by `scripts/recovery-install.test.sh`
    fails) it prints the on-macOS follow-up: `sudo ./tools/install.sh kext/Raphaeli.kext --apply`.
 8. **Safety** — `--dry-run` prints every mutating action (including the ICD json
    write and `mount -uw`) and never runs them; every failure exits non-zero with
-   a clear message.
+   a clear message. Apply mode stages userspace, ICD, firmware, kext, and auxKC
+   outputs beside their destinations, then publishes them with rollback backups;
+   any later failure restores the original files and removes transaction paths.
+9. **Target preflight** — `--target` always validates `SOURCE.lock`, including
+   when `RAPHAELI_KEXT` overrides the selected bundle source. The override does
+   not bypass target safety gates.
 
 ## Usage
 ```bash
-recovery-install.sh /Volumes/Macintosh\ HD [--apply] [--dry-run]
+recovery-install.sh /Volumes/Macintosh\ HD --target sequoia [--apply] [--dry-run]
 recovery-install.sh /Volumes/Macintosh\ HD --uninstall
 ```
 
 ## Layout notes
 Source resolution mirrors the dist zip (tools/ sibling of kext/, usr/lib/,
-firmware/) with dev-tree fallback (out/Raphaeli.kext, out/usr/lib). Source-tree
+firmware/) with dev-tree fallback (out/Raphaeli.kext, out/usr/lib). Packaged target
+bundles are selected explicitly; package.sh rejects stale vendor-wide PCI personalities.
+Source-tree
 overrides: `RAPHAELI_KEXT`, `RAPHAELI_FW_SRC`.
 
 ## Test coverage (scripts/recovery-install.test.sh)
 Fake dist tree + fake volumes in a temp dir, mocked `nvram` (state-file shim on
 PATH, run under `/bin/bash` 3.2): explicit/ambiguous/auto volume detection +
-usage output; dry-run prints and never touches nvram; apply-mode real file
-placement (dylibs, firmware, kext, ICD json with absolute library_path);
+usage output; target preflight with and without `RAPHAELI_KEXT`; dry-run prints
+and never touches nvram; apply-mode real file placement (dylibs, firmware,
+kext, ICD json with absolute library_path); injected firmware failure verifies
+userspace, ICD, firmware, kext, and transaction artifacts roll back unchanged;
 boot-args appended preserving existing args, idempotent re-apply; OC-detect
 skips kext copy but still stages firmware/userspace; SHA256SUMS good/bad;
 uninstall removes kext/firmware/ICD + strips boot-arg (lone-arg case removes

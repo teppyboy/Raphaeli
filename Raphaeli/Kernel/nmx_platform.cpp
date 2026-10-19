@@ -122,7 +122,7 @@ extern "C" int nmx_xnu_firmware_load(const char *name, void **data, size_t *size
 {
     *data = nullptr;
     *size = 0;
-    if (name == nullptr || strnstr(name, "..", strlen(name) + 1) != nullptr || name[0] == '/')
+    if (name == nullptr || nmx_compat_strnstr(name, "..", strlen(name) + 1) != nullptr || name[0] == '/')
         return EINVAL;
     char path[512];
     if (snprintf(path, sizeof(path), "%s%s", FIRMWARE_ROOT, name) >= (int)sizeof(path))

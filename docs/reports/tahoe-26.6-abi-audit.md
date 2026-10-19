@@ -1,5 +1,10 @@
 # Tahoe 26.6 IOAccel binary audit
 
+> Status: dependency audit only. This report does not validate the private
+> accelerator ABI or claim a Tahoe build. Exact target is macOS 26.6.2 / build
+> 25G83; keep `tahoe_target_validated=no` until that ABI is independently
+> validated.
+
 Compared actual x86_64 KDK binaries, not macOS marketing versions:
 
 - Sequoia 15.7.8 24G824, IOAcceleratorFamily2 v485.

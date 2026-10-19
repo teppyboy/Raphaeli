@@ -3,6 +3,7 @@
 # the port's LinuxKPI-side files, srcobj = FreeBSD-on-xnu layer, xnuobj = IOKit glue and the kext itself).
 set -euo pipefail
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
+. "$X/scripts/kernel-sdk.sh"
 OUT=$1
 cd "$X"
 "$X/scripts/ccxx.sh" $X/Raphaeli/Kernel/nmx_kext.cpp > xlog_nmx_kext.txt 2>&1 || { grep -A3 error: xlog_nmx_kext.txt | head -20; exit 1; }
@@ -14,7 +15,7 @@ xcrun ld -r -arch x86_64 obj-xe/*.o -exported_symbols_list xe.exp -o xe_all.o
 K="$OUT/Raphaeli.kext/Contents"
 mkdir -p "$K/MacOS"
 xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlinker -kext \
-  obj/*.o obj-i915/*.o xe_all.o lkobj/*.o srcobj/*.o xnuobj/*.o -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
+  obj/*.o obj-i915/*.o xe_all.o lkobj/*.o srcobj/*.o xnuobj/*.o $KERNEL_SDK_LINK -lkmodc++ -lkmod -lcc_kext -o "$K/MacOS/Raphaeli" 2> link.log || {
     grep -E "error|Undefined|duplicate" link.log | head -40; exit 1; }
 cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 echo "Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B"
