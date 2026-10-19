@@ -27,6 +27,20 @@ assert_grep 'LOG_DIR=.*OUT_TARGET' "$ROOT/scripts/link.sh" "link logs live under
 assert_grep 'exact target audit required' "$ROOT/scripts/build.sh" "build rejects unvalidated Tahoe before compilation"
 assert_grep 'exact Tahoe ABI audit required' "$ROOT/scripts/rt.sh" "rt rejects unvalidated Tahoe before compilation"
 assert_grep 'exact Tahoe ABI audit required' "$ROOT/scripts/link.sh" "link rejects unvalidated Tahoe before linking"
+assert_grep 'build-metadata.sh' "$ROOT/scripts/ccxx.sh" "kernel C++ compile derives build metadata"
+assert_grep 'build-version.txt' "$ROOT/scripts/link.sh" "link records bundle build version"
+assert_grep 'NMX_BUILD_VERSION' "$ROOT/Raphaeli/Kernel/nmx_kext.cpp" "startup and attach logs include build version"
+assert_grep 'NMX_BUILD_VERSION' "$ROOT/Raphaeli/Kernel/nmx_fb.cpp" "display startup log includes build version"
+! grep -Eq 'scanout 0x|phys 0x|address 0x' "$ROOT/Raphaeli/Kernel/nmx_fb.cpp" && ok "display diagnostics omit addresses" || bad "display diagnostics omit addresses"
+
+# Metadata is source-derived and Tahoe remains fail-closed.
+version=$($ROOT/scripts/build-metadata.sh --target sequoia --print-version) || { bad "Sequoia metadata generation"; version=""; }
+case "$version" in sequoia/*) ok "Sequoia metadata includes target and revision" ;; *) bad "Sequoia metadata includes target and revision" ;; esac
+if "$ROOT/scripts/build-metadata.sh" --target tahoe --print-version >"$TMP/tahoe-metadata.log" 2>&1; then
+  bad "Tahoe metadata rejects unvalidated target"
+else
+  grep -Fq "refusing unvalidated Tahoe" "$TMP/tahoe-metadata.log" && ok "Tahoe metadata rejects unvalidated target" || bad "Tahoe metadata rejects unvalidated target"
+fi
 
 # Duplicate selectors reject before any build or link work.
 for script in build.sh rt.sh link.sh; do

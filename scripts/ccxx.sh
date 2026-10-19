@@ -3,6 +3,8 @@
 X=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 . "$X/scripts/kernel-sdk.sh"
 mkdir -p $X/xnuobj
+METADATA_DIR=${NMX_BUILD_METADATA_DIR:-${NMX_OBJ_ROOT:-$X/xnuobj}}
+"$X/scripts/build-metadata.sh" --target "${NMX_TARGET:-sequoia}" --header "$METADATA_DIR/nmx_build_metadata.h" >/dev/null
 # nmxxnu/ holds the two boundary headers for the IOKit side (which must not see the FreeBSD include tree); they are
 # copies of bsdcompat/include's, refreshed here so a declaration added there always reaches the C++ side
 cp -p $X/Raphaeli/Compat/include/nmx_port.h $X/Raphaeli/Compat/include/nmx_xnu.h $X/Raphaeli/Compat/include/nmxxnu/
@@ -13,6 +15,6 @@ case "${NMX_TARGET:-sequoia}:$(basename "$1")" in
     target_flags="-DNM_TAHOE -I$NMX_ACCEL_HEADERS" ;;
 esac
 exec xcrun clang++ -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}=/src -mkernel -fapple-kext -nostdinc $KERNEL_SDK_INCLUDE \
-  -I$X/Raphaeli/Compat/include/nmxxnu -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT \
+  -I$X/Raphaeli/Compat/include/nmxxnu -I$METADATA_DIR -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT \
   -std=c++17 -fno-rtti -fno-exceptions -fno-builtin -fno-common -O2 -g0 -Wall -Wno-unused-parameter \
   -Wno-deprecated-declarations -Wno-inconsistent-missing-override $target_flags -c "$1" -o ${NMX_OBJ:-${NMX_OBJ_ROOT:-$X/xnuobj}/$(basename "${1%.cpp}").o}

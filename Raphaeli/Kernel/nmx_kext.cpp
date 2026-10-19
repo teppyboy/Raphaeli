@@ -23,6 +23,7 @@
 #include <kern/thread.h>
 #include "nmx_port.h"
 #include "nmx_xnu.h"
+#include "nmx_build_metadata.h"
 
 #define AMD_VENDOR 0x1002
 #define INTEL_VENDOR 0x8086
@@ -104,7 +105,7 @@ bool Raphaeli::start(IOService *provider)
         IOService::stop(provider);
         return false;
     }
-    IOLog("Raphaeli checkpoint: PCI checks passed; starting port layer\n");
+    IOLog("Raphaeli checkpoint: PCI checks passed; starting port layer (%s)\n", NMX_BUILD_VERSION);
     IOLockLock(g_lock);
     if (!g_started) {
         int err = nmx_port_start();
@@ -206,7 +207,7 @@ static void nmx_marker_write(bool on)
 
 void Raphaeli::attachNow()
 {
-    IOLog("Raphaeli checkpoint: attach thread entered\n");
+    IOLog("Raphaeli checkpoint: attach thread entered (%s)\n", NMX_BUILD_VERSION);
     int err = nmx_xnu_wait_firmware_root(300);
     if (err) {
         IOLog("Raphaeli GPU: the firmware folder never appeared (%d); this GPU stays with macOS\n", err);
@@ -223,7 +224,7 @@ void Raphaeli::attachNow()
     }
     IOLog("Raphaeli checkpoint: setting attach guard\n");
     nmx_marker_write(true);
-    IOLog("Raphaeli checkpoint: entering amdgpu attach\n");
+    IOLog("Raphaeli checkpoint: entering amdgpu attach (%s)\n", NMX_BUILD_VERSION);
     dev_ = nmx_port_attach(pci_);
     IOLog("Raphaeli checkpoint: amdgpu attach returned (%s)\n", dev_ ? "device" : "no device");
     if (dev_ == nullptr) {
@@ -258,7 +259,7 @@ void Raphaeli::attachNow()
     nmx_accel_bridge_device(pci_);
     nmx_accel_selftest();
     attach_ = 1;
-    IOLog("Raphaeli checkpoint: attach completed\n");
+    IOLog("Raphaeli checkpoint: attach completed (%s)\n", NMX_BUILD_VERSION);
 }
 
 void Raphaeli::stop(IOService *provider)
@@ -305,7 +306,7 @@ kern_return_t nmx_kmod_stop(kmod_info_t *ki, void *data);
 
 kern_return_t nmx_kmod_start(kmod_info_t *ki, void *data)
 {
-    IOLog("Raphaeli checkpoint: module start entered\n");
+    IOLog("Raphaeli checkpoint: module start entered (%s)\n", NMX_BUILD_VERSION);
     g_lock = IOLockAlloc();
     IOLog("Raphaeli checkpoint: module start %s\n", g_lock ? "ready" : "failed");
     return g_lock ? KERN_SUCCESS : KERN_FAILURE;

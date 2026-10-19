@@ -19,6 +19,7 @@
 #include <kern/thread_call.h>
 #include "nmx_xnu.h"
 #include "nmx_fb_internal.h"
+#include "nmx_build_metadata.h"
 /* the display-engine bridge: plain C decls, so the C++ consumer supplies the linkage */
 extern "C" {
 #include "nmx_dm_bridge.h"
@@ -123,6 +124,7 @@ public:
     }
 
     bool start(IOService *provider) override {
+        FBLOG("display start (%s)", NMX_BUILD_VERSION);
         IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
         uint64_t bar0_phys, bar0_size;
         int bar0_io;
@@ -174,8 +176,8 @@ public:
             uint64_t applied = 0;
             int r = nmx_dm_bridge_set_mode(pci, 0, &fModes[0], fPhys, &applied);
             if (r == 0)
-                FBLOG("display engine: %d connector(s), startup timing %ux%u programmed, scanout 0x%llx",
-                      conns, fModes[0].width, fModes[0].height, (unsigned long long)applied);
+                FBLOG("display engine: %d connector(s), startup timing %ux%u programmed",
+                      conns, fModes[0].width, fModes[0].height);
             else
                 FBLOG("display engine: %d connector(s) but the startup timing was refused (%d); "
                       "firmware timing stays until the first mode set", conns, r);
@@ -291,7 +293,7 @@ public:
                   m.height, r);
             return kIOReturnUnsupported;
         }
-        FBLOG("mode %ux%u programmed, scanout 0x%llx", m.width, m.height, (unsigned long long)applied);
+        FBLOG("mode %ux%u programmed", m.width, m.height);
         fModeIndex = i;
         applyMode();
         return kIOReturnSuccess;

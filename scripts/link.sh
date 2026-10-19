@@ -118,9 +118,11 @@ xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -fapple-kext -nostdlib -Xlink
     grep -E "error|Undefined|duplicate" "$LOG_DIR/link.log" | head -40; exit 1; }
 cp "$X/Raphaeli/Info.plist" "$K/Info.plist"
 mkdir -p "$K/Resources/firmware/amdgpu"
+"$X/scripts/build-metadata.sh" --target "$target" --print-version > "$K/Resources/build-version.txt"
+
 [ -n "$FW_BINS" ] && cp "$FWDIR"/*.bin "$K/Resources/firmware/amdgpu/"
 echo "firmware embedded: ${FW_N:-0} blobs, ${FW_BYTES:-0} B; Resources copy: $K/Resources/firmware/amdgpu"
-echo "$target Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B"
+echo "$target Raphaeli $(shasum -a 256 "$K/MacOS/Raphaeli" | cut -c1-8) $(stat -f %z "$K/MacOS/Raphaeli") B ($(cat "$K/Resources/build-version.txt"))"
 # kmutil silently classifies kexts not owned by root:wheel as codeless ('No binaries or
 # codeless kexts were provided') regardless of signature; fix ownership before building the auxKC:
 if [ "$(stat -f %u "$K/MacOS/Raphaeli")" != 0 ]; then
