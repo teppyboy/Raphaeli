@@ -58,11 +58,11 @@ create = function_body(BRIDGE, "int nmx_accel_bridge_vm_create(")
 assert "amdgpu_vm_init(" in create
 assert "*vm_out = 0;" in create
 
-# Client submission validates mapped containment and reaches the real scheduler job path; map/unmap record bo_va mappings.
+# Client submission checks mapped containment but remains fail-closed until job/VM lifetime setup is complete.
 body = function_body(BRIDGE, "int nmx_accel_bridge_client_submit(")
 assert "ib_addr >= mapping->va" in body and "mapping->size - ib_size" in body
-assert "amdgpu_job_alloc(adev, &task_vm->vm, &g_client_entity, task_vm, 1, &job)" in body
-assert "amdgpu_job_submit(job)" in body
+assert "return -ENOTSUP;" in body
+assert "amdgpu_job_alloc" not in body and "amdgpu_job_submit" not in body
 for name in ("nmx_accel_bridge_vm_map", "nmx_accel_bridge_vm_unmap"):
     body = function_body(BRIDGE, "int " + name + "(")
     assert "amdgpu_vm_bo_map(" in body or "amdgpu_vm_bo_unmap(" in body, name + " must reach the bo_va table"
@@ -108,4 +108,4 @@ for text in (
 ):
     assert text in REPORT, "report missing: " + text
 
-print("PASS: IOAccelTask::free exists in Sequoia ABI; task VM create/destroy bridge-owned; map records bo_va; client submit uses mapped scheduler jobs")
+print("PASS: IOAccelTask::free exists in Sequoia ABI; VM/map bridge ownership checked; client submit remains fail-closed without verified job lifetime")

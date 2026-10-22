@@ -1,56 +1,22 @@
-# Accel lane A — real GPU submit beyond the page-table REFUSED line
+# Accel lane A — VM-aware client submission
 
-Status: **blocked, no code change.** The bridge already runs a real ring submit. The step past
-`commitIntoGPUPageTable` REFUSED needs (a) a GPU VM bind path and (b) a decoder for the
-IOAccel command stream. Neither is in tree, and (b) needs hardware evidence.
+Status: **client submission is disabled and fail-closed.** The VM/map bridge records exist, but the former scheduler-job attempt omitted prerequisites required by the pinned AMDGPU submission path. `nmx_accel_bridge_client_submit()` now validates the bridge-owned VM/mapping and returns `-ENOTSUP`; it does not allocate or queue a job. No IOAccel caller reaches it and no client rendering is proven.
 
-## What already exists (verified in source)
+## Pinned-source findings
 
-- `nmx_accel_bridge_submit` (Override/src/nmx_accel_bridge.c): `amdgpu_ib_schedule(gfx_ring, 1, &ib, NULL, &f)`
-  with `job == NULL`, i.e. the ring-test shape. The IB is the caller's GPU address. No VM, no job.
-- `nmx_accel_bridge_fence_wait`: `dma_fence_wait_timeout`, errors propagated (accel_fence_test.py covers it).
-- `nmx_accel_bridge_alloc/dmap/free`: pinned VRAM/GTT BO, real device address (`RaphaeliVidMemory`).
-- `RaphaeliMemoryMap::commitIntoGPUPageTable` returns false (Kernel/nmx_accel_uc.cpp). Family then refuses
-  the submit at the VA-map step, so nothing reaches `nmx_xnu_accel_ring_submit` from a client.
+- `amdgpu_job_alloc()` initializes `job->vm_pd_addr` to `AMDGPU_BO_INVALID_OFFSET` (`amdgpu_job.c`). `amdgpu_cs.c` sets it to `amdgpu_gmc_pd_addr(vm->root.bo)`, updates/validates the VM, and synchronizes `vm->last_update` before submitting.
+- `amdgpu_vmid_grab()` assigns VMID/PASID at scheduler preparation only when the VM has been initialized and configured for PASID. The current bridge VM creation only calls `amdgpu_vm_init`; it has no PASID lifecycle.
+- The previous bridge used one global scheduler entity. There is no verified task-owned entity/job drain/reset lifecycle, so the entity could outlive or race its device/task.
+- Family memory-map hooks `RaphaeliMemoryMap::commitIntoGPUPageTable()` and `updateGPUPageTable()` still refuse. The bridge BO allocations and mapping records are not connected to family-created objects; there is no client IB source.
+- The IOAccel command-stream/token layout and vendor submission call path remain unverified. No private selector or packet format is inferred.
 
-## Why the submit cannot be wired honestly now
+## Current safety behavior
 
-1. **No GPU VM bind.** `commitIntoGPUPageTable` needs `amdgpu_vm_bo_map` on a per-client
-   `struct amdgpu_vm` (init via `amdgpu_vm_init`, `amdgpu_vm_make_compute` or the gfx VM path, plus
-   `amdgpu_vm_update_range`/`amdgpu_vm_clear_freed` and a VMID flush through a job). The bridge's
-   `ib_addr` is currently an unchecked raw address; a client-supplied VA would reach the ring unmapped.
-   That is the wrong-GPU-address fault the AGENTS.md no-panic rule forbids.
-2. **IB decode is unknown.** `IOAccelCommandQueue::submit_command_buffers` is family code. The token walk
-   (`processDataBuffers`) hands command streams to the vendor context. Their layout (`IOAccelCommandStreamInfo`,
-   descriptor offsets, the AMD `ati_token_process_methods` equivalents) is not reconstructed. Guessing it
-   violates "do not guess private IOAccel selectors" and is the decision recorded in accel-protocol.md §4.
-3. **No hardware.** Phoenix gfx1103 ring/VM behavior is unverified on this host. Selftest
-   `raphaeli-accel-test=1` is still hardware-gated.
+- `nmx_accel_bridge_submit()` is the kernel selftest path only and keeps the raw `amdgpu_ib_schedule(..., job=NULL, ...)` shape.
+- Client submit checks device state, argument shape, bridge VM identity, and complete mapped-range containment, then returns `-ENOTSUP` before any AMDGPU job API.
+- `RaphaeliMemoryMap` remains fail-closed. Unknown family selectors remain unsupported.
+- Focused submit, VM lifecycle, VM mapping, BO-free, task-lifetime, and VM-gate tests pass for this fail-closed contract. These host tests do not prove usable GPU page tables, fences, RADV, ABI compatibility, or hardware rendering.
 
-## Patch plan (next lane, in order)
+## Required before re-enabling client jobs
 
-1. Bridge: `nmx_accel_bridge_vm_*` wrapping a per-task `amdgpu_vm` (init/destroy on `createTask`/task free),
-   `map(bo, va, size)` → `amdgpu_vm_bo_map` + `amdgpu_vm_update_range`, `unmap` → `amdgpu_vm_bo_unmap`.
-   Gate on `adev->accel_working`, `in_suspend`, `shutdown`; return errno, never panic. Host test: mock VM ops,
-   assert unmapped VA rejected before submit.
-2. `commitIntoGPUPageTable` / `updateGPUPageTable` / `releaseFromGPUPageTable` call the bridge; keep REFUSED on
-   any bridge errno.
-3. Submit: pass a VA-validated IB (`ib_addr` must lie in a mapped range of the caller's VM) and a real
-   `amdgpu_job`/VMID so `amdgpu_vm_flush` runs. Only then does `nmx_xnu_accel_ring_submit` see client work.
-4. IOAccel decode: reconstruct `IOAccelCommandStreamInfo` from the 15.7.8 family binary, and the AMD token
-   processing for the gfx NOP/PACKET3 subset only. Unknown tokens → `kIOReturnUnsupported`.
-5. Hardware gate: selftest on target Phoenix, then WindowServer open.
-
-## Validation run
-
-- `python3 scripts/tests/accel_fence_test.py`: PASS (rc 0), fence/selftest bodies, timeout/error
-  propagation, in-flight IB retention. No source changed, so no re-build was run.
-- No edits to Raphaeli/Kernel, Raphaeli/Override, or any other tracked file. Other uncommitted changes
-  (README.md, scripts/build.sh, scripts/package.sh, scripts/rt.sh, build-all files) left untouched.
-- Nothing staged, committed, or pushed.
-
-## Residual risks
-
-- Recommended: do not enable any client-reachable submit until steps 1–2 exist; the current
-  `nmx_xnu_accel_ring_submit` takes a raw GPU address with no VM check and is reachable only via the
-  boot-arg selftest.
+Implement per-task VM/PASID ownership and scheduler entity lifetime; follow the pinned VM update and dependency sequence; connect BO and map lifetimes to verified IOAccel objects; provide fence completion/reset cleanup; and obtain exact OS ABI plus Radeon 780M hardware evidence. Until then, do not route client work through raw submit or claim GPU acceleration.

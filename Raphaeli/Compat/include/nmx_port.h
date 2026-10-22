@@ -38,7 +38,7 @@ int nmx_accel_bridge_vm_destroy(uint64_t vm);
 void nmx_accel_bridge_vm_release_all(void);
 int nmx_accel_bridge_vm_map(uint64_t vm_handle, uint64_t bo_handle, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags);
 int nmx_accel_bridge_vm_unmap(uint64_t vm_handle, uint64_t bo_handle, uint64_t va, uint64_t size);
-/* client submit: VM-aware and mapped-range-checked; fails closed (-ENOTSUP) until a task VM lifetime exists */
+/* Client submission is currently disabled (-ENOTSUP) until VMID/PASID/update and per-task job/entity lifetimes exist. */
 int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out);
 /* boot-arg selftest (raphaeli-accel-test=1): one trivial IB through the hooks, fence completion logged */
 int nmx_accel_selftest(void);

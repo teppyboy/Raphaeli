@@ -267,8 +267,6 @@ struct nmx_accel_vm {
     struct nmx_accel_vm_bo *bos;
 };
 static struct nmx_accel_vm *g_vms;
-static struct drm_sched_entity g_client_entity;
-static struct amdgpu_device *g_client_entity_adev;
 
 static int nmx_accel_vm_update(struct nmx_accel_vm *vm, struct nmx_accel_vm_bo *vm_bo,
                                bool map)
@@ -686,8 +684,6 @@ int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr,
     if (ib_addr == 0 || ib_dw == 0 || (ib_addr & 3) != 0 || ib_addr > ~(uint64_t)0 - (uint64_t)ib_dw * 4)
         return -EINVAL;
 
-    struct amdgpu_job *job = NULL;
-    struct dma_fence *fence;
     uint64_t ib_size = (uint64_t)ib_dw * 4;
     struct nmx_accel_vm *task_vm;
     struct nmx_accel_vm_bo *vm_bo;
@@ -714,44 +710,10 @@ int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr,
         return -ENOENT;
     }
 
-    if (g_client_entity_adev == NULL) {
-        struct amdgpu_sched *sched = &adev->gpu_sched[AMDGPU_HW_IP_GFX][AMDGPU_RING_PRIO_DEFAULT];
-        if (sched->num_scheds == 0) {
-            mutex_unlock(&g_bo_lock);
-            mutex_unlock(&g_vm_lock);
-            return -ENODEV;
-        }
-        r = drm_sched_entity_init(&g_client_entity, DRM_SCHED_PRIORITY_NORMAL,
-                                   sched->sched, sched->num_scheds, NULL);
-        if (r) {
-            mutex_unlock(&g_bo_lock);
-            mutex_unlock(&g_vm_lock);
-            return r;
-        }
-        g_client_entity_adev = adev;
-    } else if (g_client_entity_adev != adev) {
-        mutex_unlock(&g_bo_lock);
-        mutex_unlock(&g_vm_lock);
-        return -ENODEV;
-    }
-
-    r = amdgpu_job_alloc(adev, &task_vm->vm, &g_client_entity, task_vm, 1, &job);
-    if (r) {
-        if (job != NULL)
-            amdgpu_job_free(job);
-        mutex_unlock(&g_bo_lock);
-        mutex_unlock(&g_vm_lock);
-        return r;
-    }
-    job->num_ibs = 1;
-    job->ibs[0].gpu_addr = ib_addr;
-    job->ibs[0].length_dw = ib_dw;
-    fence = amdgpu_job_submit(job);
-    if (fence_out)
-        *fence_out = (uint64_t)(uintptr_t)fence;
     mutex_unlock(&g_bo_lock);
     mutex_unlock(&g_vm_lock);
-    return 0;
+    /* shortcut: mapped client IBs stay disabled until VMID/PASID/update and per-task entity/job lifetimes are wired. */
+    return -ENOTSUP;
 }
 
 /*
