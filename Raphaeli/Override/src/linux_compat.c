@@ -597,7 +597,8 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 	/* release the file from devfs */
 	finit(file, filp->f_mode, DTYPE_DEV, filp, &linuxfileops);
 	linux_drop_fop(ldev);
-	return (ENXIO);
+	/* success is 0: the port's nmx_cdev_open treats any nonzero d_fdopen return as a failed open */
+	return (0);
 }
 
 #define	LINUX_IOCTL_MIN_PTR 0x10000UL

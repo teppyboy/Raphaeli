@@ -20,6 +20,7 @@
 #include <sys/mutex.h>
 #include <sys/conf.h>
 #include <sys/file.h>
+#include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
 #include <sys/stdarg.h>
@@ -184,6 +185,7 @@ struct nmx_open {
     int id;
     struct file *fp;
     struct cdev *cdev;
+    struct vnode vnode;                 /* the inode LinuxKPI's open sees; v_rdev is the node */
     void *priv;                         /* devfs_set_cdevpriv */
     d_priv_dtor_t *priv_dtor;
     struct mtx maps_mtx;
@@ -265,7 +267,9 @@ int nmx_cdev_open(void *cookie, int open_id, int fflags)
         return ENOMEM;
     }
     dev_ref(c);
+    o->vnode.v_rdev = c;                /* iminor() of the open reads the node through this */
     fp->f_count = 1;
+    fp->f_vnode = &o->vnode;
     fp->f_flag = (u_int)fflags & (FREAD | FWRITE | O_NONBLOCK | O_APPEND);
     fp->f_type = DTYPE_DEV;
     o->id = open_id;
