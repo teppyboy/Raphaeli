@@ -34,6 +34,8 @@ int nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu);
 /* per-task GPU VM; handles are opaque and map/unmap return negative errno on failure */
 int nmx_accel_bridge_vm_create(uint64_t *vm_out);
 int nmx_accel_bridge_vm_destroy(uint64_t vm);
+/* releases every live task VM; nmx_port_detach calls it before the device is removed */
+void nmx_accel_bridge_vm_release_all(void);
 int nmx_accel_bridge_vm_map(uint64_t vm, uint64_t bo, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags);
 int nmx_accel_bridge_vm_unmap(uint64_t vm, uint64_t bo, uint64_t va, uint64_t size);
 /* client submit: VM-aware and mapped-range-checked; fails closed (-ENOTSUP) until a task VM lifetime exists */

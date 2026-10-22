@@ -17,6 +17,8 @@
 #include <linux/pci.h>
 #include <linux/dma-fence.h>
 #include <linux/jiffies.h>
+#include <linux/mutex.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <string.h>
 
@@ -183,12 +185,40 @@ int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
 }
 
 /*
- * Per-task GPU VM (fail-closed). Sequoia KDK evidence confirms IOAccelTask::free runs family map cleanup before its
- * superclass free chain; a subclass free override runs before that cleanup, and there is no post-base callback before
- * object deallocation. No safe whole-VM teardown point has been verified, so create refuses after device gates and
- * issues no handle; with no handle issued, destroy/map/unmap
- * reject every value. No amdgpu call is made here. shortcut: no task VM until map/PTE teardown and VM ownership can be
- * ordered safely; upgrade with a verified family lifecycle or explicit independent task-lifetime contract. */
+ * Per-task GPU VM: a bridge-owned record around one amdgpu_vm, created with amdgpu_vm_init and released by destroy or
+ * by nmx_accel_bridge_vm_release_all (called from nmx_port_detach before the driver detaches). The handle is the record's
+ * address; only live records are in the registry, so an unknown or repeated handle is refused without touching amdgpu.
+ * shortcut: no PASID is allocated (the open path's amdgpu_pasid_alloc + amdgpu_vm_set_pasid), so GPU faults cannot be
+ * attributed to a task; upgrade with task fault identity. shortcut: release-all frees every record on any port detach,
+ * correct while v1 serves one GPU; upgrade by matching records to the detaching device. */
+struct nmx_accel_vm {
+    struct amdgpu_device *adev;
+    struct amdgpu_vm vm;
+    struct nmx_accel_vm *next;
+};
+static DEFINE_MUTEX(g_vm_lock);
+static struct nmx_accel_vm *g_vms;
+
+static void nmx_accel_vm_fini(struct nmx_accel_vm *vm)
+{
+    amdgpu_vm_fini(vm->adev, &vm->vm);
+    kfree(vm);
+}
+
+/* unlinks the live record whose handle is 'handle'; NULL when there is none (never issued, or already destroyed) */
+static struct nmx_accel_vm *nmx_accel_vm_unlink(uint64_t handle)
+{
+    mutex_lock(&g_vm_lock);
+    struct nmx_accel_vm **link = &g_vms;
+    while (*link != NULL && (uint64_t)(uintptr_t)*link != handle)
+        link = &(*link)->next;
+    struct nmx_accel_vm *vm = *link;
+    if (vm != NULL)
+        *link = vm->next;
+    mutex_unlock(&g_vm_lock);
+    return vm;
+}
+
 int nmx_accel_bridge_vm_create(uint64_t *vm_out)
 {
     if (vm_out == NULL)
@@ -199,13 +229,47 @@ int nmx_accel_bridge_vm_create(uint64_t *vm_out)
         return -ENODEV;
     if (adev->in_suspend || adev->shutdown)
         return -EBUSY;
-    return -ENOTSUP;
+    struct nmx_accel_vm *vm = kzalloc(sizeof(*vm), GFP_KERNEL);
+    if (vm == NULL)
+        return -ENOMEM;
+    /* the KMS open path's XCP value: NO_PARTITION only when a partition manager exists, else 0 (amdgpu_xcp.c) */
+    int32_t xcp_id = adev->xcp_mgr != NULL ? AMDGPU_XCP_NO_PARTITION : 0;
+    int r = amdgpu_vm_init(adev, &vm->vm, xcp_id);
+    if (r) {
+        kfree(vm);
+        return r;
+    }
+    vm->adev = adev;
+    mutex_lock(&g_vm_lock);
+    vm->next = g_vms;
+    g_vms = vm;
+    mutex_unlock(&g_vm_lock);
+    *vm_out = (uint64_t)(uintptr_t)vm;
+    return 0;
 }
 
+/* no device gate: teardown must still release the VM while the device shuts down */
 int nmx_accel_bridge_vm_destroy(uint64_t vm)
 {
-    (void)vm;
-    return -EINVAL;
+    struct nmx_accel_vm *rec = nmx_accel_vm_unlink(vm);
+    if (rec == NULL)
+        return -EINVAL;
+    nmx_accel_vm_fini(rec);
+    return 0;
+}
+
+/* port detach, before the driver detaches: every record is released while its amdgpu_device is still live */
+void nmx_accel_bridge_vm_release_all(void)
+{
+    mutex_lock(&g_vm_lock);
+    struct nmx_accel_vm *vms = g_vms;
+    g_vms = NULL;
+    mutex_unlock(&g_vm_lock);
+    while (vms != NULL) {
+        struct nmx_accel_vm *next = vms->next;
+        nmx_accel_vm_fini(vms);
+        vms = next;
+    }
 }
 
 /* device gates shared by map/unmap, in the order the client path requires (no amdgpu call) */
@@ -237,8 +301,8 @@ static int nmx_accel_bridge_vm_check_range(struct amdgpu_device *adev, uint64_t 
     return 0;
 }
 
-/* shortcut: no task VM/bo_va record exists, so a valid request returns -ENOTSUP; upgrade with the verified task lifetime
- * hook and a bridge-owned bo_va table that also checks offset + size against the BO size */
+/* shortcut: no bo_va record exists, so a valid request returns -ENOTSUP; upgrade with a bridge-owned bo_va table (amdgpu_vm_bo_add,
+ * amdgpu_vm_bo_map under drm_exec PD locking) that also checks offset + size against the BO size */
 int nmx_accel_bridge_vm_map(uint64_t vm, uint64_t bo, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags)
 {
     (void)flags;

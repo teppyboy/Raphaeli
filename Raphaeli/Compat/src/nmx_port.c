@@ -116,6 +116,7 @@ void nmx_port_detach(void *dev)
 {
     if (dev == NULL)
         return;
+    nmx_accel_bridge_vm_release_all();
     nmx_bus_remove_device(dev);
     nmx_device_forget(dev);
 }

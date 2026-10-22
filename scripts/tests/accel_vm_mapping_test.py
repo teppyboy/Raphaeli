@@ -1,7 +1,7 @@
 """Phase C host contract for fail-closed BO/VA mapping.
 
-No task VM handle is issued yet (nmx_accel_bridge_vm_create refuses), so no amdgpu_bo_va or mapping can be
-owned and map/unmap must refuse.  This test compiles the real bridge bodies against mocked device state and
+Task VM handles come from the bridge-owned registry (accel_vm_lifecycle_test.py), but no bo_va record exists, so
+no amdgpu_bo_va or mapping can be owned and map/unmap must refuse.  This test compiles the real bridge bodies against mocked device state and
 proves the validation boundary that runs before any refusal: device gates, zero/overflow/misaligned VA and
 size, the pinned reserved bottom/top and GMC hole, and offset overflow.  It also proves no amdgpu call, no
 file-scope mapping record, and the unchanged BO free order used by teardown.

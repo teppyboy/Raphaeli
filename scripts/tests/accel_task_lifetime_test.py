@@ -49,14 +49,13 @@ for source_root in (ROOT / "Raphaeli/Kernel", ROOT / "Raphaeli/Override/src"):
         if source_path.suffix in IMPLEMENTATION_SUFFIXES and source_path.name != "nmx_accel_uc.cpp":
             assert not free_definition.search(source_path.read_text()), "RaphaeliTask::free defined outside nmx_accel_uc.cpp: " + str(source_path)
 
-# The bridge rationale must distinguish the verified family free virtual from a safe post-map VM-finalization hook.
-assert "IOAccelTask::free" in BRIDGE
-assert "No safe whole-VM teardown point has" in BRIDGE
+# The bridge rationale must distinguish the verified family free virtual from the port-detach release point.
+assert "IOAccelTask::free" in REPORT
+assert "nmx_accel_bridge_vm_release_all" in BRIDGE
 
-# VM creation remains fail-closed: no amdgpu_vm_init and no handle provisioning.
+# VM creation is owned by the bridge: amdgpu_vm_init on a registry record, no handle before it succeeds.
 create = function_body(BRIDGE, "int nmx_accel_bridge_vm_create(")
-assert "return -ENOTSUP;" in create
-assert "amdgpu_vm_init(" not in create
+assert "amdgpu_vm_init(" in create
 assert "*vm_out = 0;" in create
 
 # Mapping and client submission remain fail-closed after their validation gates.
@@ -106,4 +105,4 @@ for text in (
 ):
     assert text in REPORT, "report missing: " + text
 
-print("PASS: IOAccelTask::free exists in Sequoia ABI; Raphaeli task and VM bridge remain fail-closed")
+print("PASS: IOAccelTask::free exists in Sequoia ABI; task VM create/destroy bridge-owned; map and client submit fail-closed")

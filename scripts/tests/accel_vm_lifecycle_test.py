@@ -1,10 +1,11 @@
-"""Host contract for the fail-closed per-task GPU VM bridge (Phase B).
+"""Host contract for the bridge-owned task VM lifecycle.
 
-No task VM is created yet: the pinned amdgpu_vm_init/amdgpu_vm_fini lifetime is not bound to a verified
-RaphaeliTask hook (IOAccelTask declares no destroy/free slot), so the bridge refuses every VM operation.
-This test compiles the real bridge bodies against mocked device state and amdgpu counters and proves:
-create passes the device gates, refuses with no handle and no amdgpu call; destroy/map/unmap refuse
-unknown handles (double destroy and teardown included) without touching amdgpu; and no file-scope VM exists.
+nmx_accel_bridge_vm_create calls the pinned amdgpu_vm_init with the KMS open path's XCP value, and destroy or
+nmx_accel_bridge_vm_release_all calls amdgpu_vm_fini. This test compiles the real bridge bodies against amdgpu stubs
+that count calls, and proves: device gates refuse before any amdgpu call; the XCP value matches the open path; an
+init failure frees its record; destroy releases exactly the live record; an unknown or repeated handle is refused
+without touching amdgpu; and release-all frees every live record. Map/unmap is still fail-closed (see
+accel_vm_mapping_test.py).
 """
 import re
 import subprocess
@@ -13,21 +14,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = (ROOT / "Raphaeli/Override/src/nmx_accel_bridge.c").read_text()
-KMS = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_kms.c").read_text()
-VM_SOURCE = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_vm.c").read_text()
-XCP = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_xcp.c").read_text()
-UMSCH = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_umsch_mm.c").read_text()
-DEVICE = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c").read_text()
-VM_FUNCTIONS = (
-    "nmx_accel_bridge_vm_create",
-    "nmx_accel_bridge_vm_destroy",
-    "nmx_accel_bridge_vm_map",
-    "nmx_accel_bridge_vm_unmap",
-)
-
-
-def function(name, return_type="int"):
-    return source_function(SOURCE, return_type + " " + name + "(")
+AMDGPU = ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu"
+KMS = (AMDGPU / "amdgpu_kms.c").read_text()
+VM_SOURCE = (AMDGPU / "amdgpu_vm.c").read_text()
+XCP = (AMDGPU / "amdgpu_xcp.c").read_text()
+PORT_C = (ROOT / "Raphaeli/Compat/src/nmx_port.c").read_text()
+PORT_HEADERS = [
+    (ROOT / "Raphaeli/Compat/include/nmx_port.h").read_text(),
+    (ROOT / "Raphaeli/Compat/include/nmxxnu/nmx_port.h").read_text(),
+]
 
 
 def source_function(source, signature):
@@ -43,77 +38,33 @@ def source_function(source, signature):
     return source[start:end]
 
 
-# Pin the real amdgpu lifecycle rather than inferring it from the fail-closed bridge.
+# Pinned amdgpu lifecycle: the open path passes fpriv->xcp_id, and fini is the matching teardown.
 open_kms = source_function(KMS, "int amdgpu_driver_open_kms(")
-open_steps = (
-    "pasid = amdgpu_pasid_alloc(16);",
-    "r = amdgpu_xcp_open_device(adev, fpriv, file_priv);",
-    "r = amdgpu_vm_init(adev, &fpriv->vm, fpriv->xcp_id);",
-    "r = amdgpu_vm_set_pasid(adev, &fpriv->vm, pasid);",
-)
-assert all(step in open_kms for step in open_steps)
-assert [open_kms.index(step) for step in open_steps] == sorted(open_kms.index(step) for step in open_steps)
-assert "if (pasid < 0)" in open_kms and "pasid = 0;" in open_kms
-# DRM's permissive no-PASID fallback is not a task-VM policy: task creation must fail if identity cannot be allocated.
-pasid_fallback = open_kms[open_kms.index("if (pasid < 0)"):open_kms.index("r = amdgpu_xcp_open_device")]
-assert "pasid = 0;" in pasid_fallback and "return" not in pasid_fallback
-
-postclose = source_function(KMS, "void amdgpu_driver_postclose_kms(")
-close_steps = (
-    "pasid = fpriv->vm.pasid;",
-    "pd = amdgpu_bo_ref(fpriv->vm.root.bo);",
-    "amdgpu_vm_fini(adev, &fpriv->vm);",
-    "amdgpu_pasid_free_delayed(pd->tbo.base.resv, pasid);",
-)
-assert all(step in postclose for step in close_steps)
-assert [postclose.index(step) for step in close_steps] == sorted(postclose.index(step) for step in close_steps)
-
-vm_init = source_function(VM_SOURCE, "int amdgpu_vm_init(")
-assert "r = amdgpu_vm_init_entities(adev, vm);" in vm_init
-assert "r = amdgpu_vm_pt_create(adev, vm, adev->vm_manager.root_level," in vm_init
-assert "false, &root, xcp_id);" in vm_init
-# Failed init has internal rollback; DRM open also finalizes on post-init failures.
-assert "goto error_free_delayed;" in vm_init and "error_free_delayed:" in vm_init
-assert "error_vm:" in open_kms and "amdgpu_vm_fini(adev, &fpriv->vm);" in open_kms
+assert "r = amdgpu_vm_init(adev, &fpriv->vm, fpriv->xcp_id);" in open_kms
+xcp_open = source_function(XCP, "int amdgpu_xcp_open_device(")
+assert "if (!adev->xcp_mgr)" in xcp_open and "fpriv->xcp_id = AMDGPU_XCP_NO_PARTITION;" in xcp_open
 vm_fini = source_function(VM_SOURCE, "void amdgpu_vm_fini(")
 assert "amdgpu_vm_set_pasid(adev, vm, 0);" in vm_fini
-assert "amdgpu_vm_pt_free_root(adev, vm);" in vm_fini
-assert "amdgpu_vm_fini_entities(vm);" in vm_fini
-vm_manager_fini = source_function(VM_SOURCE, "void amdgpu_vm_manager_fini(")
-assert "WARN_ON(!xa_empty(&adev->vm_manager.pasids));" in vm_manager_fini
 
-xcp_open = source_function(XCP, "int amdgpu_xcp_open_device(")
-assert "fpriv->xcp_id = AMDGPU_XCP_NO_PARTITION;" in xcp_open
-assert "fpriv->xcp_id = i;" in xcp_open
-assert "fpriv->vm.mem_id = fpriv->xcp_id == AMDGPU_XCP_NO_PARTITION ? -1 :" in xcp_open
-assert "if (!adev->xcp_mgr)" in xcp_open and "return 0;" in xcp_open
-assert "if (file_priv->minor == adev->xcp_mgr->xcp[i].ddev->render)" in xcp_open
-assert "if (adev->xcp_mgr->xcp[i].valid == FALSE)" in xcp_open
+# Port wiring: nmx_port_detach releases task VMs before the device is removed.
+detach = source_function(PORT_C, "void nmx_port_detach(void *dev)")
+assert detach.index("nmx_accel_bridge_vm_release_all();") < detach.index("nmx_bus_remove_device(dev);")
+for header in PORT_HEADERS:
+    assert "void nmx_accel_bridge_vm_release_all(void);" in header
 
-fini_hw = source_function(DEVICE, "void amdgpu_device_fini_hw(")
-fini_sw = source_function(DEVICE, "void amdgpu_device_fini_sw(")
-assert "adev->shutdown = true;" in fini_hw
-assert "amdgpu_device_ip_fini(adev);" in fini_sw
-assert "adev->accel_working = false;" in fini_sw
-
-# UMSCH's private selftest has its own VM and PASID, but is not a task/fpriv model.
-ums_setup = source_function(UMSCH, "static int setup_umsch_mm_test(")
-ums_cleanup = source_function(UMSCH, "static void cleanup_umsch_mm_test(")
-assert "amdgpu_vm_init(adev, test->vm, -1);" in ums_setup
-assert "amdgpu_pasid_alloc(16);" in ums_setup
-assert "amdgpu_vm_set_pasid" not in ums_setup + ums_cleanup
-assert "fpriv" not in ums_setup + ums_cleanup
-assert "amdgpu_pasid_free(test->pasid);" in ums_cleanup
-assert "amdgpu_vm_fini(adev, test->vm);" in ums_cleanup
-
-
-# Static contract: the fail-closed bodies never reach amdgpu, the raw ring-test submit, or a client flag.
-for name in VM_FUNCTIONS:
-    body = function(name)
-    assert not re.search(r"\bamdgpu_\w+\s*\(", body), name + " must not call amdgpu before a verified lifetime"
-    assert "nmx_accel_bridge_submit" not in body and "amdgpu_ib_schedule" not in body, name
+# Static contract: no file-scope amdgpu_vm; map/unmap keep their own gates.
 assert not re.search(r"^(?:static\s+)?struct\s+amdgpu_vm\b", SOURCE, re.M), "no file-scope (global) amdgpu_vm"
 assert "raphaeli-accel-client-test" not in SOURCE, "client test flag must stay absent"
+
+# The registry block (record type, lock, list head, and every function that touches them) is one contiguous span.
+REGISTRY = SOURCE[SOURCE.index("struct nmx_accel_vm {"):SOURCE.index("/* device gates shared by map/unmap")]
+assert "static DEFINE_MUTEX(g_vm_lock);" in REGISTRY and "static struct nmx_accel_vm *g_vms;" in REGISTRY
+# The release path and create path must reach amdgpu only through these pinned calls.
+create = source_function(SOURCE, "int nmx_accel_bridge_vm_create(")
+assert create.count("amdgpu_vm_init(") == 1 and "amdgpu_vm_fini(" not in create
+assert "xcp_mgr != NULL ? AMDGPU_XCP_NO_PARTITION : 0" in create
+assert create.index("amdgpu_vm_init(") < create.index("vm->adev = adev;")
+assert "kfree(vm);" in create.split("amdgpu_vm_init(")[1].split("}")[0]
 
 HARNESS = r'''
 #include <assert.h>
@@ -121,38 +72,46 @@ HARNESS = r'''
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-typedef uint64_t u64;
-#define AMDGPU_GPU_PAGE_SIZE 4096
-#define AMDGPU_GPU_PAGE_SHIFT 12
-#define AMDGPU_GPU_PAGE_MASK (AMDGPU_GPU_PAGE_SIZE - 1)
-#define AMDGPU_GMC_HOLE_START 0x0000800000000000ULL
-#define AMDGPU_GMC_HOLE_END 0xffff800000000000ULL
-#define AMDGPU_VA_RESERVED_BOTTOM (1ULL << 16)
-#define AMDGPU_VA_RESERVED_TOP (6ULL << 20)
-struct amdgpu_vm_manager { uint64_t max_pfn; };
-struct amdgpu_device { bool accel_working; bool in_suspend; bool shutdown; struct amdgpu_vm_manager vm_manager; };
-struct amdgpu_vm { int unused; };
-struct amdgpu_device device = { true, false, false, { 1ULL << 20 } };
-void *g_iopci = &device;
+#include <stdlib.h>
+#include <string.h>
+
+#define AMDGPU_XCP_NO_PARTITION (~0)
+#define GFP_KERNEL 0
+#define DEFINE_MUTEX(name) int name
+#define mutex_lock(m) (void)(m)
+#define mutex_unlock(m) (void)(m)
+#define kzalloc(size, flags) calloc(1, (size))
+#define kfree(p) free(p)
+
+struct amdgpu_vm { int pasid; };
+struct amdgpu_xcp_mgr { int unused; };
+struct amdgpu_device {
+    bool accel_working;
+    bool in_suspend;
+    bool shutdown;
+    struct amdgpu_xcp_mgr *xcp_mgr;
+};
+static struct amdgpu_device device = { true, false, false, NULL };
+static void *g_iopci = &device;
 struct amdgpu_device *adev_of(void *iopci) { return iopci == &device ? &device : NULL; }
-int vm_init_calls, vm_fini_calls, bo_map_calls, bo_unmap_calls;
-int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t x) { (void)a; (void)vm; (void)x; ++vm_init_calls; return 0; }
-void amdgpu_vm_fini(struct amdgpu_device *a, struct amdgpu_vm *vm) { (void)a; (void)vm; ++vm_fini_calls; }
-int amdgpu_vm_bo_map(struct amdgpu_device *a, struct amdgpu_vm *vm, u64 va, u64 off, u64 size, u64 flags) { (void)a; (void)vm; (void)va; (void)off; (void)size; (void)flags; ++bo_map_calls; return 0; }
-int amdgpu_vm_bo_unmap(struct amdgpu_device *a, struct amdgpu_vm *vm, u64 va) { (void)a; (void)vm; (void)va; ++bo_unmap_calls; return 0; }
-'''
-# The map/unmap bodies call the static device-gate and range helpers; compile them with the public bodies.
-HARNESS += function("nmx_accel_bridge_vm_gate", "static int")
-HARNESS += function("nmx_accel_bridge_vm_check_range", "static int")
-for name in VM_FUNCTIONS:
-    HARNESS += function(name)
-HARNESS += r'''
-static void assert_no_amdgpu_calls(void) {
-    assert(vm_init_calls == 0 && vm_fini_calls == 0 && bo_map_calls == 0 && bo_unmap_calls == 0);
+
+int vm_init_calls, vm_fini_calls;
+int32_t last_xcp_id;
+int vm_init_fail;
+int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t xcp_id) {
+    (void)a; (void)vm;
+    ++vm_init_calls;
+    last_xcp_id = xcp_id;
+    return vm_init_fail;
 }
+void amdgpu_vm_fini(struct amdgpu_device *a, struct amdgpu_vm *vm) { (void)a; (void)vm; ++vm_fini_calls; }
+'''
+HARNESS += REGISTRY
+HARNESS += r'''
+#define VM_ASSERT_NO_AMDGPU(v, f) assert(vm_init_calls == (v) && vm_fini_calls == (f))
 int main(void) {
-    u64 vm = 0xdead;
-    /* create: device gates precede everything and refuse without a handle */
+    uint64_t vm = 0xdead;
+    /* device gates refuse before any amdgpu call */
     g_iopci = NULL;
     assert(nmx_accel_bridge_vm_create(&vm) == -ENODEV && vm == 0);
     g_iopci = &device;
@@ -166,20 +125,42 @@ int main(void) {
     assert(nmx_accel_bridge_vm_create(&vm) == -EBUSY && vm == 0);
     device.shutdown = false;
     assert(nmx_accel_bridge_vm_create(NULL) == -EINVAL);
-    /* a gated-in create is still refused: no verified task lifetime, so no VM and no leaked handle */
-    vm = 0xdead;
-    assert(nmx_accel_bridge_vm_create(&vm) == -ENOTSUP && vm == 0);
-    assert_no_amdgpu_calls();
-    /* destroy: no record exists, so every handle (including a repeated one) is unknown */
+    VM_ASSERT_NO_AMDGPU(0, 0);
+
+    /* no partition manager: the open path leaves xcp_id at 0 */
+    assert(nmx_accel_bridge_vm_create(&vm) == 0 && vm != 0);
+    assert(last_xcp_id == 0 && vm_init_calls == 1);
+    uint64_t first = vm;
+    /* with a partition manager the open path's NO_PARTITION value is used */
+    struct amdgpu_xcp_mgr mgr;
+    device.xcp_mgr = &mgr;
+    uint64_t second = 0;
+    assert(nmx_accel_bridge_vm_create(&second) == 0 && second != 0 && second != first);
+    assert(last_xcp_id == AMDGPU_XCP_NO_PARTITION);
+    device.xcp_mgr = NULL;
+
+    /* destroy releases the exact live record; a repeated or unknown handle is refused without amdgpu */
+    assert(nmx_accel_bridge_vm_destroy(second) == 0);
+    VM_ASSERT_NO_AMDGPU(2, 1);
+    assert(nmx_accel_bridge_vm_destroy(second) == -EINVAL);
     assert(nmx_accel_bridge_vm_destroy(0) == -EINVAL);
-    assert(nmx_accel_bridge_vm_destroy(1) == -EINVAL);
-    assert(nmx_accel_bridge_vm_destroy(1) == -EINVAL);
-    /* map/unmap during teardown or for unknown handles never reach amdgpu */
-    assert(nmx_accel_bridge_vm_map(0, 1, 0x100000, 0, 4096, 0) == -EINVAL);
-    assert(nmx_accel_bridge_vm_map(1, 1, 0x100000, 0, 4096, 0) == -ENOTSUP);
-    assert(nmx_accel_bridge_vm_unmap(1, 1, 0x100000, 4096) == -ENOTSUP);
-    assert_no_amdgpu_calls();
-    puts("PASS: fail-closed task VM contract: device gates, create rollback, double destroy, teardown, no global VM");
+    assert(nmx_accel_bridge_vm_destroy(0xbad) == -EINVAL);
+    VM_ASSERT_NO_AMDGPU(2, 1);
+
+    /* a failed amdgpu_vm_init issues no handle and frees its record */
+    vm_init_fail = -ENOMEM;
+    vm = 0xdead;
+    assert(nmx_accel_bridge_vm_create(&vm) == -ENOMEM && vm == 0);
+    vm_init_fail = 0;
+    VM_ASSERT_NO_AMDGPU(3, 1);
+
+    /* release-all frees every live record (the one left from the first create) and then nothing */
+    nmx_accel_bridge_vm_release_all();
+    VM_ASSERT_NO_AMDGPU(3, 2);
+    assert(nmx_accel_bridge_vm_destroy(first) == -EINVAL);
+    nmx_accel_bridge_vm_release_all();
+    VM_ASSERT_NO_AMDGPU(3, 2);
+    puts("PASS: bridge-owned task VM lifecycle: create via amdgpu_vm_init, destroy, release-all, refusals");
     return 0;
 }
 '''
@@ -188,6 +169,6 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     source = path / "vm_lifecycle.c"
     source.write_text(HARNESS)
-    subprocess.run(["clang", "-std=c2x", "-Wall", "-Wextra", "-Werror", str(source),
+    subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", str(source),
                     "-o", str(path / "test")], check=True)
     subprocess.run([str(path / "test")], check=True)
