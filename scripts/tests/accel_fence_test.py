@@ -55,7 +55,7 @@ int nmx_accel_bridge_alloc(u64, u64, unsigned, u64 *bo, u64 *addr, void **cpu) {
     *bo = 1; *addr = 8192; *cpu = memory; return 0;
 }
 u64 nmx_accel_bridge_dmap(u64) { return 8192; }
-void nmx_accel_bridge_free(u64, u64, void *) { ++vram_frees; }
+int nmx_accel_bridge_free(u64, u64, void *) { ++vram_frees; return 0; }
 int nmx_xnu_accel_ring_submit(unsigned, u64, unsigned, u64 *value) {
     *value = (uintptr_t)&fence; return submit_result;
 }

@@ -34,12 +34,19 @@ def bundle(root, name):
     return path, binary, info
 
 
+def require_sequoia(version, label):
+    # Sequoia only: a Tahoe (26.x) Recovery or KDK must never supply binaries for this stage.
+    if not version.startswith("15."):
+        raise ValueError(label + " is macOS " + version + ", not Sequoia 15.x")
+
 def prepare(efi, recovery, kdk):
     efi, recovery, kdk = efi.resolve(), recovery.resolve(), kdk.resolve()
     config = efi / "EFI/OC/config.plist"
     cfg = plist(config)
     target_version = plist(recovery / "System/Library/CoreServices/SystemVersion.plist")
     kdk_version = plist(kdk / "System/Library/CoreServices/SystemVersion.plist")
+    require_sequoia(target_version["ProductVersion"], "Recovery")
+    require_sequoia(kdk_version["ProductVersion"], "KDK")
     build = target_version["ProductBuildVersion"]
     if build != kdk_version["ProductBuildVersion"]:
         raise ValueError("Recovery/KDK build mismatch")

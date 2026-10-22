@@ -129,9 +129,7 @@ class RaphaeliTask : public IOAccelTask {
 #if defined(NM_TAHOE)
     NM_TAHOE_FWD(RaphaeliTask)
 #endif
-    /* no vendor overrides: the family's own IOAccelTask (init/allocate/freeAllGPUMappings) does the
-       task accounting from the IORangeAllocator** RaphaeliAccel hands it; GPU VM stays refused in the
-       map (no page tables yet) */
+    /* no task override: whole-VM lifetime is unverified; bridge stays fail-closed */
 };
 class RaphaeliMemoryMap : public IOAccelMemoryMap {
     OSDeclareDefaultStructors(RaphaeliMemoryMap)

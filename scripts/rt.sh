@@ -1,5 +1,5 @@
 #!/bin/bash
-# rt.sh: rebuilds the port's runtime against the current headers: LinuxKPI's runtime sources (forks from
+# rt.sh: rebuilds and validates the port's runtime against the current headers: LinuxKPI's runtime sources (forks from
 # override/src replace the originals of the same name; sources the port replaces or does not use are left out),
 # the port's own LinuxKPI-side files, bsdcompat/src and the xnu glue. Prints failures only, then counts.
 R=${GPU_SRC_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
@@ -64,7 +64,8 @@ for f in $X/Raphaeli/Kernel/*.cpp; do
     b=$(basename "$f" .cpp); n=$((n + 1))
     NMX_OBJ_ROOT="$objroot/xnuobj" "$X/scripts/ccxx.sh" "$f" > "$NMX_LOG_ROOT/xnu_$b.log" 2>&1 || { echo "XNU FAIL $b"; fail=$((fail + 1)); }
 done
-echo "$target runtime sources: $n  failed: $fail"
-[ "$fail" -eq 0 ]
+EXPECTED=81
+echo "$target runtime sources: $n/$EXPECTED failed: $fail"
+[ "$n" -eq "$EXPECTED" ] && [ "$fail" -eq 0 ]
 }
 case "$TARGET_SELECTOR" in all) run_target sequoia && run_target tahoe ;; *) run_target "$TARGET_SELECTOR" ;; esac

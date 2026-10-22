@@ -74,6 +74,16 @@ mk_kext "$ROOT/out/target/Tahoe/Raphaeli.kext" tahoe
 : > "$ROOT/out/usr/lib/libdrm.2.dylib"
 : > "$ROOT/out/usr/lib/libdrm_amdgpu.1.dylib"
 : > "$ROOT/out/usr/lib/libvulkan_radeon.dylib"
+cat > "$ROOT/out/usr/lib/radeon_icd.x86_64.json" <<'EOF'
+{
+  "ICD": {
+    "api_version": "1.4.363",
+    "library_arch": "64",
+    "library_path": "libvulkan_radeon.dylib"
+  },
+  "file_format_version": "1.0.1"
+}
+EOF
 : > "$ROOT/firmware/amdgpu/test.bin"
 for firmware_name in \
   gc_11_0_1_pfp.bin gc_11_0_1_me.bin gc_11_0_1_rlc.bin \

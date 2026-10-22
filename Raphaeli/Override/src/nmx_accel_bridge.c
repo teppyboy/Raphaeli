@@ -149,13 +149,21 @@ uint64_t nmx_accel_bridge_dmap(uint64_t bo)
     return amdgpu_bo_gpu_offset(b);
 }
 
-void nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu)
+int nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu)
 {
     struct amdgpu_bo *b = (struct amdgpu_bo *)(uintptr_t)bo;
     if (b == NULL)
-        return;
-    u64 addr = gpu_addr;
-    amdgpu_bo_free_kernel(&b, &addr, &cpu);
+        return 0;
+    if (amdgpu_bo_reserve(b, true) != 0)
+        return -EBUSY;
+    /* always: amdgpu_bo_create_kernel kmaps the BO; pinned amdgpu_bo_kunmap is a no-op without a kmap */
+    amdgpu_bo_kunmap(b);
+    amdgpu_bo_unpin(b);
+    amdgpu_bo_unreserve(b);
+    amdgpu_bo_unref(&b);
+    (void)gpu_addr;
+    (void)cpu;
+    return 0;
 }
 
 int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
@@ -172,6 +180,114 @@ int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
     if (left == 0 || status == 0)
         return -ETIME;
     return status < 0 ? status : 0;
+}
+
+/*
+ * Per-task GPU VM (fail-closed). Sequoia KDK evidence confirms IOAccelTask::free runs family map cleanup before its
+ * superclass free chain; a subclass free override runs before that cleanup, and there is no post-base callback before
+ * object deallocation. No safe whole-VM teardown point has been verified, so create refuses after device gates and
+ * issues no handle; with no handle issued, destroy/map/unmap
+ * reject every value. No amdgpu call is made here. shortcut: no task VM until map/PTE teardown and VM ownership can be
+ * ordered safely; upgrade with a verified family lifecycle or explicit independent task-lifetime contract. */
+int nmx_accel_bridge_vm_create(uint64_t *vm_out)
+{
+    if (vm_out == NULL)
+        return -EINVAL;
+    *vm_out = 0;
+    struct amdgpu_device *adev = g_iopci != NULL ? adev_of(g_iopci) : NULL;
+    if (adev == NULL || !adev->accel_working)
+        return -ENODEV;
+    if (adev->in_suspend || adev->shutdown)
+        return -EBUSY;
+    return -ENOTSUP;
+}
+
+int nmx_accel_bridge_vm_destroy(uint64_t vm)
+{
+    (void)vm;
+    return -EINVAL;
+}
+
+/* device gates shared by map/unmap, in the order the client path requires (no amdgpu call) */
+static int nmx_accel_bridge_vm_gate(struct amdgpu_device **adev_out)
+{
+    struct amdgpu_device *adev = g_iopci != NULL ? adev_of(g_iopci) : NULL;
+    if (adev == NULL || !adev->accel_working)
+        return -ENODEV;
+    if (adev->in_suspend || adev->shutdown)
+        return -EBUSY;
+    *adev_out = adev;
+    return 0;
+}
+
+/* pinned amdgpu_gem.c / amdgpu_vm_verify_parameters rules: page-aligned, nonzero size, no overflow, reserved bottom
+ * and top, GMC hole, last page below max_pfn (no amdgpu call) */
+static int nmx_accel_bridge_vm_check_range(struct amdgpu_device *adev, uint64_t va, uint64_t offset, uint64_t size)
+{
+    if (size == 0 || ((va | offset | size) & AMDGPU_GPU_PAGE_MASK))
+        return -EINVAL;
+    if (offset > ~(uint64_t)0 - size || va > ~(uint64_t)0 - size)
+        return -EINVAL;
+    if (va < AMDGPU_VA_RESERVED_BOTTOM)
+        return -EINVAL;
+    if (va < AMDGPU_GMC_HOLE_END && va + size > AMDGPU_GMC_HOLE_START)
+        return -EINVAL;
+    if (va + size > (adev->vm_manager.max_pfn << AMDGPU_GPU_PAGE_SHIFT) - AMDGPU_VA_RESERVED_TOP)
+        return -EINVAL;
+    return 0;
+}
+
+/* shortcut: no task VM/bo_va record exists, so a valid request returns -ENOTSUP; upgrade with the verified task lifetime
+ * hook and a bridge-owned bo_va table that also checks offset + size against the BO size */
+int nmx_accel_bridge_vm_map(uint64_t vm, uint64_t bo, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags)
+{
+    (void)flags;
+    struct amdgpu_device *adev = NULL;
+    int r = nmx_accel_bridge_vm_gate(&adev);
+    if (r)
+        return r;
+    if (vm == 0 || bo == 0)
+        return -EINVAL;
+    r = nmx_accel_bridge_vm_check_range(adev, va, offset, size);
+    if (r)
+        return r;
+    return -ENOTSUP;
+}
+
+int nmx_accel_bridge_vm_unmap(uint64_t vm, uint64_t bo, uint64_t va, uint64_t size)
+{
+    struct amdgpu_device *adev = NULL;
+    int r = nmx_accel_bridge_vm_gate(&adev);
+    if (r)
+        return r;
+    if (vm == 0 || bo == 0)
+        return -EINVAL;
+    r = nmx_accel_bridge_vm_check_range(adev, va, 0, size);
+    if (r)
+        return r;
+    return -ENOTSUP;
+}
+
+/*
+ * Client submit (Phase D): the only entry for client work, distinct from the NULL-job selftest submit above. Gates and
+ * shape checks run before any amdgpu call: device gates, VM handle, ring bounds, dword-aligned IB with a non-zero
+ * length whose end does not overflow. A shape-valid IB is refused: no task VM, bo_va mapping, scheduler entity, or
+ * job lifetime is verified, so the IB cannot be proven mapped in that VM and no job or fence is ever produced.
+ * shortcut: no task VM/entity/job lifetime and no mapped-range record exist, so every valid request returns -ENOTSUP;
+ * upgrade once the task lifetime hook, bo_va table, and drm_sched entity ownership are verified (accel-vm-gate report). */
+int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out)
+{
+    if (fence_out)
+        *fence_out = 0;
+    struct amdgpu_device *adev = NULL;
+    int r = nmx_accel_bridge_vm_gate(&adev);
+    if (r)
+        return r;
+    if (vm == 0 || ring >= adev->gfx.num_gfx_rings)
+        return -EINVAL;
+    if (ib_addr == 0 || ib_dw == 0 || (ib_addr & 3) != 0 || ib_addr > ~(uint64_t)0 - (uint64_t)ib_dw * 4)
+        return -EINVAL;
+    return -ENOTSUP;
 }
 
 /*

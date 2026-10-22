@@ -182,20 +182,11 @@ for target_name in $TARGET_NAMES; do
   stage_kext "$target_kext" "$STAGE/target/$target_name/Raphaeli.kext"
 done
 cp out/usr/lib/*.dylib "$STAGE/usr/lib/"
-if [ -f out/usr/lib/radeon_icd.x86_64.json ]; then
-  cp out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/"
-else
-  cat > "$STAGE/usr/lib/radeon_icd.x86_64.json" <<'EOF'
-{
-    "ICD": {
-        "api_version": "1.4.363",
-        "library_arch": "64",
-        "library_path": "libvulkan_radeon.dylib"
-    },
-    "file_format_version": "1.0.1"
+[ -s out/usr/lib/radeon_icd.x86_64.json ] || {
+  echo "missing out/usr/lib/radeon_icd.x86_64.json - build userspace first" >&2
+  exit 1
 }
-EOF
-fi
+cp out/usr/lib/radeon_icd.x86_64.json "$STAGE/usr/lib/"
 cp firmware/amdgpu/*.bin "$STAGE/firmware/amdgpu/"
 cp scripts/install.sh scripts/recovery-install.sh scripts/collect-recovery.sh scripts/oc-stage-graphics.py scripts/oc-install.py scripts/oc-install.sh scripts/target-preflight.sh "$STAGE/tools/"
 cp Raphaeli/Kernel/Accel/upstream/SOURCE.lock "$STAGE/tools/"
@@ -266,7 +257,11 @@ sed -i.bak \
   "$STAGE/INSTALL.md"
 rm -f "$STAGE/INSTALL.md.bak"
 
-( cd dist && rm -f "$NAME.zip" && zip -qr "$NAME.zip" "$NAME" )
+# Write and verify a temporary archive; the final ZIP appears only after zip and
+# integrity checks succeed. An older release remains intact on preflight failure.
+ZIP_TMP="$NAME.zip.tmp.$$"
+rm -f "dist/$ZIP_TMP"
+( cd dist && zip -qr "$ZIP_TMP" "$NAME" && unzip -tq "$ZIP_TMP" && mv -f "$ZIP_TMP" "$NAME.zip" )
 echo "dist/$NAME.zip:"; ls -la "dist/$NAME.zip"
 
 # native installer (userspace + firmware only - the zip covers the kext route)

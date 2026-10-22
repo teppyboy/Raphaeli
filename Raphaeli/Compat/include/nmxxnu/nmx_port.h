@@ -29,7 +29,15 @@ int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms);
 int nmx_accel_bridge_alloc(uint64_t size, uint64_t align, uint32_t domain, uint64_t *bo_out,
                            uint64_t *gpu_addr_out, void **cpu_out);
 uint64_t nmx_accel_bridge_dmap(uint64_t bo);
-void nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu);
+/* Returns 0 when ownership was released; negative errno leaves the BO owned by the caller. */
+int nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu);
+/* per-task GPU VM; handles are opaque and map/unmap return negative errno on failure */
+int nmx_accel_bridge_vm_create(uint64_t *vm_out);
+int nmx_accel_bridge_vm_destroy(uint64_t vm);
+int nmx_accel_bridge_vm_map(uint64_t vm, uint64_t bo, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags);
+int nmx_accel_bridge_vm_unmap(uint64_t vm, uint64_t bo, uint64_t va, uint64_t size);
+/* client submit: VM-aware and mapped-range-checked; fails closed (-ENOTSUP) until a task VM lifetime exists */
+int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out);
 /* boot-arg selftest (raphaeli-accel-test=1): one trivial IB through the hooks, fence completion logged */
 int nmx_accel_selftest(void);
 

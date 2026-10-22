@@ -145,3 +145,109 @@ hosts/tests. Real-hardware runs must revisit this.
 - `work-metalplugin/icd/lvp_icd.x86_64.json` — lavapipe ICD manifest
 - `work-mesa/build-lvp/` — lavapipe build (1 local Darwin patch: `lp_fence.c` ppoll)
 - `/tmp/m2v-smoke-lane/kernel.spv` — profile-translated SPIR-V
+
+## 6. Repo-side status (Lane B, 2026-10-17): exact missing layers
+
+No ObjC plugin was built. Reason: the only Metal runtime in-tree (`deps/metal2vulkan`, pinned
+submodule, read-only here) is pure Rust with no C ABI (no `#[no_mangle]`, no `cdylib`/`staticlib`),
+so an ObjC `MTLCreateSystemDefaultDevice` shim cannot call it without a new FFI crate, which is an
+unapproved design decision. Nothing faked.
+
+Missing layers, in order from app to GPU:
+
+1. **Metal plugin binding** (`Raphaeli/Metal/`, absent): an ObjC bundle implementing the
+   `MetalPluginClassName` device class, backed by a C ABI over metal2vulkan-runtime (new crate
+   needed; decision pending).
+2. **Plugin registration** (`Raphaeli/Kernel/nmx_accel.cpp`, `Raphaeli/Info.plist`): `RaphaeliAccel`
+   publishes no `MetalPluginName` / `MetalPluginClassName` / `IOGLBundleName`. Reference:
+   `research/nvidia-macos-driver/kexts/NVRM/accel/nmx/Info.plist` lines 37-38.
+3. **Vendor discovery** (userspace): read `vendor-id` from the parent of the accelerator IOService
+   (reference: `nvmtl_vk.c:64-115`) to pick RADV for 0x1002.
+4. **GPU device nodes**: `/dev/dri` absent on this host. Needs NMXGPU attach (`raphaeli-amd=1`),
+   hardware-gated on the Phoenix target.
+5. **RADV ICD on this host**: `out/usr/share/vulkan/icd.d/radeon_icd.x86_64.json` exists, but
+   `out/usr/lib/radeon_icd.x86_64.json` (build.sh target) does not; `install_name` points at `out/`.
+   Smoke through RADV fails with `VkResultCode(-3)` (no GPUs), as before.
+
+Verified this pass: lavapipe smoke (`VK_DRIVER_FILES=work-metalplugin/icd/lvp_icd.x86_64.json`,
+run from `work-metalplugin/smoke/`) prints `SMOKE TEST PASS`.
+
+Preflight: `scripts/metal-preflight.sh` reports each layer as ready/BLOCKED (exit 2 when blocked),
+test `scripts/metal-preflight.test.sh` (fixture roots). Current host: 4 layers blocked.
+
+## 7. Lane 2 (2026-10-17): C ABI scaffold, no backend
+
+Survey: `deps/metal2vulkan` (pinned submodule, read-only) has no C ABI. `grep` for `no_mangle`,
+`crate-type`, `cdylib`, `staticlib` finds nothing in `crates/`. `metal2vulkan-runtime` is `[lib]`
+rlib only, and its `extern "C"` uses are Objective-C runtime imports, not exports. So a real Rust FFI
+boundary cannot be built without changing the pinned submodule, which is out of scope.
+
+Shipped instead (no acceleration claimed):
+
+- `Raphaeli/Metal/nmx_metal_shim.h` / `.c`: C ABI seam. `nmx_metal_backend_available()` returns 0;
+  `nmx_metal_create_device()` returns `NMX_METAL_UNSUPPORTED` with `*device_out = NULL`.
+- `scripts/tests/nmx_metal_shim_test.c` + `scripts/metal-shim.test.sh`: builds the shim with
+  `clang -std=c11 -Wall -Wextra -Werror` and asserts the unsupported contract. 4 checks, all pass.
+- `scripts/metal-preflight.sh` unchanged: `metal-plugin-objc` stays BLOCKED (the shim is C, not the
+  ObjC `.m` plugin the check looks for). Current host: 4 layers blocked, rc=2.
+
+Not done (needs decisions): a Rust `cdylib` over metal2vulkan-runtime, which requires a change to the
+pinned submodule or a new crate; the ObjC `MTLCreateSystemDefaultDevice` bundle; plugin registration in
+`Info.plist`. No Metal support is claimed: nothing has executed a GPU dispatch through this shim.
+
+## 8. Lane 3 (2026-10-17): plugin ABI and registration contract, still absent
+
+Re-checked against pinned `deps/metal2vulkan` (720ef1ce) and current tree: no change, nothing shipped.
+
+Missing contract, exactly what a Metal plugin needs before acceleration can be advertised:
+
+1. **Runtime C ABI**: `deps/metal2vulkan` exports no `#[no_mangle]` symbols and declares no `cdylib`/`staticlib`
+   (`extern "C"` hits are Objective-C/creation-log imports only). Required: a new FFI crate or an approved
+   submodule change exposing device create/destroy, buffer, library, and dispatch entry points.
+2. **Plugin binding**: no `Raphaeli/Metal/*.m` ObjC class (`MetalPluginClassName`) implementing the
+   device interface. `nmx_metal_shim.{h,c}` is a C seam that always returns `NMX_METAL_UNSUPPORTED`; it is
+   not a plugin and does not satisfy `metal-plugin-objc`.
+3. **Registration**: `Raphaeli/Info.plist` and `RaphaeliAccel` publish no `MetalPluginName` /
+   `MetalPluginClassName`. Reference shape (NVIDIA, not copied): `research/nvidia-macos-driver/kexts/NVRM/accel/nmx/Info.plist:37-38`
+   (`MetalPluginName` bundle-relative path, `MetalPluginClassName`). The bundle path and class name for
+   Raphaeli are undecided.
+4. **Vendor discovery**: userspace read of `vendor-id` from the accelerator's parent (reference
+   `nvmtl_vk.c:64-115`); no ABI chosen.
+
+Preflight guard: `scripts/metal-preflight.test.sh` now asserts that a provisioned plugin source without a
+`MetalPluginName` registration keeps `metal-plugin-registration` BLOCKED (rc=2). Caveat: the check is a
+key-presence grep, so a plist containing the key in a comment would read ready; it proves nothing about a
+loadable plugin.
+
+## 9. Lane 4 (2026-10-21, Task 6 of gpu-acceleration plan): blocked, gate added
+
+Status: blocked. Gate test: `scripts/tests/metal_plugin_gate_test.py` (static, host-only). No runtime
+backend, no ObjC plugin, no registration: `Raphaeli/Metal/nmx_metal_shim.{h,c}` stays
+`NMX_METAL_UNSUPPORTED` and nothing here claims acceleration.
+
+Re-verified at pin `deps/metal2vulkan` 720ef1ce:
+
+- `#[no_mangle]`: 0 hits in all `*.rs`. `extern "C"` hits are Objective-C runtime imports, dyld
+  callbacks, creation-log imports, and test fixtures, not exports.
+- `crate-type`: not declared. `deps/metal2vulkan/crates/metal2vulkan-runtime/Cargo.toml` `[lib]` is
+  `name = "metal2vulkan_runtime"`, `path = "src/lib.rs"`, with the default rlib type; no `cdylib`/`staticlib`.
+- `Raphaeli/Info.plist`: no `MetalPluginName`, `MetalPluginClassName`, or `IOGLBundleName`.
+- `Raphaeli/Metal/`: no `*.m` plugin source.
+
+Missing symbols and contracts, exactly (none may be claimed until each exists):
+
+1. Runtime C ABI: a versioned wrapper crate (or an approved submodule change) that exports device
+   create/destroy, resource lifetime, AIR/metallib library creation, pipeline/encoder/dispatch,
+   synchronization, and status translation. Decision on wrapper vs. submodule change is not made
+   (plan §6 step 1 requires it be recorded).
+2. ObjC plugin under `Raphaeli/Metal/*.m` implementing the `MetalPluginClassName` device class over (1).
+3. Registration in `Raphaeli/Info.plist`: `MetalPluginName` and `MetalPluginClassName` (plus any bundle
+   key), added only after the ObjC bundle loads (plan §6 step 5).
+4. Vendor discovery: `IOObjectConformsTo` + parent `vendor-id` == `0x1002` (userspace only).
+
+Host gate (`python3 scripts/tests/metal_plugin_gate_test.py`) fails if any item above appears without
+the contract, and checks that the shim still reports unsupported and makes no dlopen/Vulkan/Metal calls.
+It also asserts this report names the gate and `Status: blocked`. It does not prove loadability.
+
+Live `scripts/metal-preflight.sh`: rc=2, 4 layers BLOCKED (radv-icd-manifest, gpu-device-nodes,
+metal-plugin-objc, metal-plugin-registration).

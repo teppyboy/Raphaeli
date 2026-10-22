@@ -62,12 +62,11 @@ OSDefineMetaClassAndStructors(RaphaeliDisplayMachine, IOAccelLegacyDisplayMachin
 
 OSDefineMetaClassAndStructors(RaphaeliTask, IOAccelTask)
 
-/* ---- memory map: the family's GART hook; v0 has no page tables, so nothing ever maps ---------------------------- */
-
+/* GPU VM is intentionally fail-closed until a complete task-lifetime bridge exists. */
 bool RaphaeliMemoryMap::commitIntoGPUPageTable()
 {
     static unsigned n;
-    if (uc_log_sample(n, 8)) ACCELLOG("memory map commit REFUSED - no GPU page tables (v0)");
+    if (uc_log_sample(n, 8)) ACCELLOG("memory map commit REFUSED - GPU VM bridge disabled");
     return false;
 }
 void RaphaeliMemoryMap::releaseFromGPUPageTable() {}
@@ -159,7 +158,10 @@ void RaphaeliVidMemory::deallocPhysical()
     if (!fBo)
         return;
     if (uc_log_sample(n, 8)) ACCELLOG("vid memory deallocPhysical(%p): releasing unverified backing", this);
-    nmx_accel_bridge_free(fBo, fPhys, nullptr);
+    if (nmx_accel_bridge_free(fBo, fPhys, nullptr) != 0) {
+        if (uc_log_sample(n, 8)) ACCELLOG("vid memory deallocPhysical(%p): bridge kept active BO", this);
+        return;
+    }
     fBo = fPhys = fBytes = 0;
 }
 

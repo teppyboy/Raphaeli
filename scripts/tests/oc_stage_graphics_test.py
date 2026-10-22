@@ -32,7 +32,7 @@ class StageGraphicsTest(unittest.TestCase):
         self.save(self.config, self.original)
         for root in (self.recovery, self.kdk):
             self.save(root / "System/Library/CoreServices/SystemVersion.plist",
-                      {"ProductBuildVersion": "25G83"})
+                      {"ProductVersion": "15.7.8", "ProductBuildVersion": "25G83"})
         for index, name in enumerate(MODULE.FAMILIES):
             # Exercise both flat IOGraphicsFamily and Contents IOAccelerator bundles.
             bundle = self.kdk / "System/Library/Extensions" / (name + ".kext")
@@ -89,7 +89,7 @@ class StageGraphicsTest(unittest.TestCase):
 
     def test_build_mismatch(self):
         self.save(self.kdk / "System/Library/CoreServices/SystemVersion.plist",
-                  {"ProductBuildVersion": "25G72"})
+                  {"ProductVersion": "15.7.8", "ProductBuildVersion": "25G72"})
         with self.assertRaisesRegex(ValueError, "build mismatch"):
             self.prepare()
 

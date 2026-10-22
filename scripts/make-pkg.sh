@@ -54,6 +54,9 @@ fi
 for tool in pkgbuild productbuild plutil install_name_tool; do
   command -v $tool >/dev/null || { echo "missing $tool" >&2; exit 1; }
 done
+# Derive the ICD api_version from the Mesa-generated manifest before any staging; fail closed.
+. "$R/scripts/icd-api-version.sh"
+API_VER=$(icd_api_version out/usr/share/vulkan/icd.d/radeon_icd.x86_64.json) || { echo "missing ICD api_version - run scripts/build.sh" >&2; exit 1; }
 
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
@@ -61,10 +64,10 @@ mkdir -p "$STAGE"/{usr-local/usr/local/share/vulkan/icd.d,usr-local/Library/Raph
 
 # --- component 1: userspace ---------------------------------------------------
 # ICD json ships with an absolute library_path (loader-agnostic, matches install.sh layout).
-cat > "$STAGE/usr-local/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json" <<'EOF'
+cat > "$STAGE/usr-local/usr/local/share/vulkan/icd.d/radeon_icd.x86_64.json" <<EOF
 {
     "ICD": {
-        "api_version": "1.4.363",
+        "api_version": "$API_VER",
         "library_arch": "64",
         "library_path": "/Library/Raphaeli/usr/lib/libvulkan_radeon.dylib"
     },
