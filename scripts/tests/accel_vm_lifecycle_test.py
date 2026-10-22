@@ -58,13 +58,19 @@ assert "raphaeli-accel-client-test" not in SOURCE, "client test flag must stay a
 
 # The registry block (record type, lock, list head, and every function that touches them) is one contiguous span.
 REGISTRY = SOURCE[SOURCE.index("struct nmx_accel_vm {"):SOURCE.index("/* device gates shared by map/unmap")]
-assert "static DEFINE_MUTEX(g_vm_lock);" in REGISTRY and "static struct nmx_accel_vm *g_vms;" in REGISTRY
+assert "static DEFINE_MUTEX(g_vm_lock);" in SOURCE and "static struct nmx_accel_vm *g_vms;" in REGISTRY
 # The release path and create path must reach amdgpu only through these pinned calls.
 create = source_function(SOURCE, "int nmx_accel_bridge_vm_create(")
 assert create.count("amdgpu_vm_init(") == 1 and "amdgpu_vm_fini(" not in create
 assert "xcp_mgr != NULL ? AMDGPU_XCP_NO_PARTITION : 0" in create
 assert create.index("amdgpu_vm_init(") < create.index("vm->adev = adev;")
 assert "kfree(vm);" in create.split("amdgpu_vm_init(")[1].split("}")[0]
+
+# The lifecycle harness compiles the real VM-registry span (locks, BO record, free, VM create/destroy/release-all,
+# gates, map, unmap) against stubs; the mapping contract (accel_vm_mapping_test.py) checks the map/unmap bodies in it.
+def span(begin, end):
+    return SOURCE[SOURCE.index(begin):SOURCE.index(end)]
+
 
 HARNESS = r'''
 #include <assert.h>
@@ -74,39 +80,79 @@ HARNESS = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+typedef uint64_t u64;
 #define AMDGPU_XCP_NO_PARTITION (~0)
-#define GFP_KERNEL 0
+#define AMDGPU_GPU_PAGE_SIZE 4096
+#define AMDGPU_GPU_PAGE_SHIFT 12
+#define AMDGPU_GPU_PAGE_MASK (AMDGPU_GPU_PAGE_SIZE - 1)
+#define AMDGPU_GMC_HOLE_START 0x0000800000000000ULL
+#define AMDGPU_GMC_HOLE_END 0xffff800000000000ULL
+#define AMDGPU_VA_RESERVED_BOTTOM (1ULL << 16)
+#define AMDGPU_VA_RESERVED_TRAP_SIZE (2ULL << 12)
+#define AMDGPU_VA_RESERVED_SEQ64_SIZE (2ULL << 20)
+#define AMDGPU_VA_RESERVED_CSA_SIZE (2ULL << 20)
+#define AMDGPU_VA_RESERVED_TOP (AMDGPU_VA_RESERVED_TRAP_SIZE + AMDGPU_VA_RESERVED_SEQ64_SIZE + AMDGPU_VA_RESERVED_CSA_SIZE)
 #define DEFINE_MUTEX(name) int name
 #define mutex_lock(m) (void)(m)
 #define mutex_unlock(m) (void)(m)
+#define GFP_KERNEL 0
+#define DRM_EXEC_INTERRUPTIBLE_WAIT 1
+#define DRM_EXEC_IGNORE_DUPLICATES 2
 #define kzalloc(size, flags) calloc(1, (size))
 #define kfree(p) free(p)
+#define drm_exec_until_all_locked(exec) for (int __once = 1; __once; __once = 0)
+#define drm_exec_retry_on_contention(exec) ((void)0)
 
-struct amdgpu_vm { int pasid; };
+struct drm_exec { int locks; };
 struct amdgpu_xcp_mgr { int unused; };
+struct amdgpu_vm_manager { u64 max_pfn; };
 struct amdgpu_device {
     bool accel_working;
     bool in_suspend;
     bool shutdown;
+    struct amdgpu_vm_manager vm_manager;
     struct amdgpu_xcp_mgr *xcp_mgr;
 };
-static struct amdgpu_device device = { true, false, false, NULL };
+struct amdgpu_vm { int pasid; };
+struct ttm_bo_stub { int unused; };
+struct amdgpu_bo { u64 size; int kmapped; struct { struct ttm_bo_stub base; } tbo; };
+struct amdgpu_bo_va { struct amdgpu_bo *bo; int maps; };
+static struct amdgpu_device device = { true, false, false, { 1ULL << 20 }, NULL };
 static void *g_iopci = &device;
 struct amdgpu_device *adev_of(void *iopci) { return iopci == &device ? &device : NULL; }
 
-int vm_init_calls, vm_fini_calls;
+int vm_init_calls, vm_fini_calls, vm_init_fail;
 int32_t last_xcp_id;
-int vm_init_fail;
 int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t xcp_id) {
-    (void)a; (void)vm;
-    ++vm_init_calls;
-    last_xcp_id = xcp_id;
-    return vm_init_fail;
+    (void)a; (void)vm; ++vm_init_calls; last_xcp_id = xcp_id; return vm_init_fail;
 }
 void amdgpu_vm_fini(struct amdgpu_device *a, struct amdgpu_vm *vm) { (void)a; (void)vm; ++vm_fini_calls; }
+struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *a, struct amdgpu_vm *vm, struct amdgpu_bo *bo) {
+    (void)a; (void)vm; struct amdgpu_bo_va *v = calloc(1, sizeof(*v)); v->bo = bo; return v;
+}
+int amdgpu_vm_bo_map(struct amdgpu_device *a, struct amdgpu_bo_va *v, u64 addr, u64 offset, u64 size, u64 flags) {
+    (void)a; (void)v; (void)addr; (void)offset; (void)size; (void)flags; return 0;
+}
+int amdgpu_vm_bo_unmap(struct amdgpu_device *a, struct amdgpu_bo_va *v, u64 addr) { (void)a; (void)v; (void)addr; return 0; }
+void amdgpu_vm_bo_del(struct amdgpu_device *a, struct amdgpu_bo_va *v) { (void)a; free(v); }
+int amdgpu_vm_bo_update(struct amdgpu_device *a, struct amdgpu_bo_va *v, bool clear) { (void)a; (void)v; (void)clear; return 0; }
+bool amdgpu_vm_ready(struct amdgpu_vm *vm) { (void)vm; return true; }
+int amdgpu_vm_clear_freed(struct amdgpu_device *a, struct amdgpu_vm *vm, void *f) { (void)a; (void)vm; (void)f; return 0; }
+int amdgpu_vm_update_pdes(struct amdgpu_device *a, struct amdgpu_vm *vm, bool immediate) { (void)a; (void)vm; (void)immediate; return 0; }
+int amdgpu_vm_lock_pd(struct amdgpu_vm *vm, struct drm_exec *exec, unsigned int n) { (void)vm; (void)n; exec->locks++; return 0; }
+int drm_exec_lock_obj(struct drm_exec *exec, void *obj) { (void)obj; exec->locks++; return 0; }
+void drm_exec_init(struct drm_exec *exec, unsigned flags, unsigned n) { (void)flags; (void)n; exec->locks = 0; }
+void drm_exec_fini(struct drm_exec *exec) { (void)exec; }
+int amdgpu_bo_reserve(struct amdgpu_bo *bo, bool no_intr) { (void)bo; (void)no_intr; return 0; }
+void amdgpu_bo_kunmap(struct amdgpu_bo *bo) { (void)bo; }
+void amdgpu_bo_unpin(struct amdgpu_bo *bo) { (void)bo; }
+void amdgpu_bo_unreserve(struct amdgpu_bo *bo) { (void)bo; }
+void amdgpu_bo_unref(struct amdgpu_bo **bo) { (void)bo; }
+u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo) { (void)bo; return 0; }
 '''
-HARNESS += REGISTRY
+HARNESS += span("/* VM and BO registries are bridge ownership boundaries", "kern_return_t nmx_xnu_accel_ring_submit(")
+HARNESS += span("uint64_t nmx_accel_bridge_dmap(uint64_t bo)", "int nmx_accel_bridge_fence_wait(")
+HARNESS += span("struct nmx_accel_vm_bo;", "/*\n * Client submit (Phase D)")
 HARNESS += r'''
 #define VM_ASSERT_NO_AMDGPU(v, f) assert(vm_init_calls == (v) && vm_fini_calls == (f))
 int main(void) {

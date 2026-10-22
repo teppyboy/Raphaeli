@@ -24,34 +24,66 @@ def function(name):
     return SOURCE[start:end]
 
 
+# The free body is compiled from the real bridge source: the BO record, its registry locks, and nmx_accel_bridge_free.
+def span(begin, end):
+    return SOURCE[SOURCE.index(begin):SOURCE.index(end)]
+
+
 HARNESS = r'''
 #include <assert.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 typedef uint64_t u64;
-struct amdgpu_bo { int unused; };
-struct amdgpu_bo buffer;
-int reserve_result;
+#define DEFINE_MUTEX(name) int name
+#define mutex_lock(m) (void)(m)
+#define mutex_unlock(m) (void)(m)
+#define kzalloc(size, flags) calloc(1, (size))
+#define kfree(p) free(p)
+#define GFP_KERNEL 0
+#define DRM_EXEC_INTERRUPTIBLE_WAIT 1
+#define DRM_EXEC_IGNORE_DUPLICATES 2
+struct drm_exec { int locks; };
+struct amdgpu_device { int unused; };
+struct amdgpu_vm { int unused; };
+struct amdgpu_bo_va { int unused; };
+struct ttm_bo_stub { int unused; };
+struct amdgpu_bo { u64 size; struct { struct ttm_bo_stub base; } tbo; };
 char trace[16];
 int trace_len;
 static void record(char op) { trace[trace_len++] = op; trace[trace_len] = 0; }
+int reserve_result;
 int amdgpu_bo_reserve(struct amdgpu_bo *bo, bool no_intr) { (void)bo; (void)no_intr; record('r'); return reserve_result; }
 void amdgpu_bo_kunmap(struct amdgpu_bo *bo) { (void)bo; record('k'); }
 void amdgpu_bo_unpin(struct amdgpu_bo *bo) { (void)bo; record('p'); }
 void amdgpu_bo_unreserve(struct amdgpu_bo *bo) { (void)bo; record('u'); }
 void amdgpu_bo_unref(struct amdgpu_bo **bo) { (void)bo; record('f'); }
+u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo) { (void)bo; return 0; }
+static struct amdgpu_bo buffer = { 8192, { { 0 } } };
 '''
-HARNESS += function("nmx_accel_bridge_free")
+HARNESS += span("static DEFINE_MUTEX(g_vm_lock);", "static DEFINE_MUTEX(g_bo_lock);")
+HARNESS += "static DEFINE_MUTEX(g_bo_lock);\nstatic struct nmx_accel_bo_record *g_bos;\n"
+HARNESS += "static bool nmx_accel_bridge_bo_is_mapped(struct amdgpu_bo *bo) { (void)bo; return false; }\n"
+HARNESS += span("int nmx_accel_bridge_free(", "int nmx_accel_bridge_fence_wait(")
 HARNESS += r'''
-int main() {
+int main(void) {
     const u64 bo = (uintptr_t)&buffer;
+    struct nmx_accel_bo_record *rec = calloc(1, sizeof(*rec));
+    rec->bo = &buffer; rec->size = 8192; rec->next = g_bos; g_bos = rec;
     /* uc deallocPhysical shape: cpu == NULL on a kmapped BO, so kunmap must still run before unpin */
     reserve_result = 0;
     assert(nmx_accel_bridge_free(bo, 8192, NULL) == 0);
     assert(strcmp(trace, "rkpuf") == 0);
+    /* the record is gone after a successful free: a second free of the same handle is refused */
+    trace_len = 0; trace[0] = 0;
+    assert(nmx_accel_bridge_free(bo, 8192, NULL) == -EINVAL);
+    assert(trace_len == 0);
+    /* re-register for the busy case */
+    rec = calloc(1, sizeof(*rec));
+    rec->bo = &buffer; rec->size = 8192; rec->next = g_bos; g_bos = rec;
     /* active BO: reserve refused, nothing torn down, caller keeps ownership */
     trace_len = 0; trace[0] = 0;
     reserve_result = -EBUSY;
@@ -62,6 +94,7 @@ int main() {
     assert(nmx_accel_bridge_free(0, 0, NULL) == 0);
     assert(trace_len == 0);
     puts("PASS: free kunmaps a kmapped BO with NULL CPU out; active BO refused without teardown");
+    return 0;
 }
 '''
 with tempfile.TemporaryDirectory() as directory:

@@ -58,10 +58,12 @@ create = function_body(BRIDGE, "int nmx_accel_bridge_vm_create(")
 assert "amdgpu_vm_init(" in create
 assert "*vm_out = 0;" in create
 
-# Mapping and client submission remain fail-closed after their validation gates.
-for name in ("nmx_accel_bridge_vm_map", "nmx_accel_bridge_vm_unmap", "nmx_accel_bridge_client_submit"):
+# Client submission remains fail-closed until the submit slice lands; map/unmap record real bo_va mappings.
+body = function_body(BRIDGE, "int nmx_accel_bridge_client_submit(")
+assert "return -ENOTSUP;" in body, "nmx_accel_bridge_client_submit must stay fail-closed"
+for name in ("nmx_accel_bridge_vm_map", "nmx_accel_bridge_vm_unmap"):
     body = function_body(BRIDGE, "int " + name + "(")
-    assert "return -ENOTSUP;" in body, name + " must stay fail-closed"
+    assert "amdgpu_vm_bo_map(" in body or "amdgpu_vm_bo_unmap(" in body, name + " must reach the bo_va table"
 
 # Check report evidence tokens; exact binary ABI evidence was independently captured from the local KDK.
 for text in (
@@ -105,4 +107,4 @@ for text in (
 ):
     assert text in REPORT, "report missing: " + text
 
-print("PASS: IOAccelTask::free exists in Sequoia ABI; task VM create/destroy bridge-owned; map and client submit fail-closed")
+print("PASS: IOAccelTask::free exists in Sequoia ABI; task VM create/destroy bridge-owned; map records bo_va; client submit fail-closed")

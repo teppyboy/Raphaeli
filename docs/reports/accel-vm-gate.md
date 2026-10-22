@@ -84,12 +84,14 @@ Source evidence paths:
 or task-owned VM field. The bridge evidence is
 `Raphaeli/Override/src/nmx_accel_bridge.c`.
 
-The current fail-closed behavior remains:
+The current behavior:
 
-- `nmx_accel_bridge_vm_create` applies device gates, zeroes `*vm_out`, then
-  returns `-ENOTSUP`; it makes no `amdgpu_vm_init` call and produces no handle;
+- `nmx_accel_bridge_vm_create` applies device gates, then calls `amdgpu_vm_init`
+  with the open path's XCP value and registers the VM record;
 - `nmx_accel_bridge_vm_map` and `nmx_accel_bridge_vm_unmap` validate device,
-  handle, and ranges, then return `-ENOTSUP` for an otherwise valid operation;
+  handle, and ranges, then record the BO range in a bridge-owned `bo_va` table
+  under drm_exec PD and BO locks (`amdgpu_vm_bo_add`/`_map`/`_unmap`/`_del`);
+  a failed PDE update rolls the mapping back, and a mapped BO cannot be freed;
 - `nmx_accel_bridge_client_submit` validates device, VM, ring, and IB shape,
   zeroes an optional fence output, then returns `-ENOTSUP` without creating an
   amdgpu job or fence;
@@ -124,8 +126,7 @@ The proven virtual `free()` does not resolve these lifetime and ABI questions:
 6. **Family-vs-bridge teardown ordering is unproven.** The bridge must not tear
    down task VM state while family cleanup or delayed releases can still use it.
 
-Until these are verified, do not add a `RaphaeliTask::free()` override, call
-`amdgpu_vm_init`/`amdgpu_vm_fini`, create a VM handle, enable mapping, or replace
+Until these are verified, do not add a `RaphaeliTask::free()` override or replace
 client-submit `-ENOTSUP` with `amdgpu_job_alloc`/`amdgpu_job_submit`.
 
 ## Static contract test
@@ -133,9 +134,8 @@ client-submit `-ENOTSUP` with `amdgpu_job_alloc`/`amdgpu_job_submit`.
 `scripts/tests/accel_task_lifetime_test.py` checks report evidence tokens and
 source state; it does not parse the ABI binary. The exact ABI evidence was
 independently captured from the local KDK and is recorded here. The test checks
-that `RaphaeliTask` has no free override; VM creation is `-ENOTSUP`, zeroes its
-output, and has no `amdgpu_vm_init`; map, unmap, and client submit retain their
-fail-closed `-ENOTSUP` paths; and the report identifies the binary, section,
+that `RaphaeliTask` has no free override; client submit retains its fail-closed
+`-ENOTSUP` path; map and unmap reach the `bo_va` table; and the report identifies the binary, section,
 addresses, offset/index conventions, virtual teardown, and every remaining
 lifetime block.
 `scripts/tests/accel_vm_lifecycle_test.py` remains the host contract for the

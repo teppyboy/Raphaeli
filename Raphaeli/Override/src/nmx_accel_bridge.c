@@ -24,6 +24,7 @@
 
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
+#include <drm/drm_exec.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,6 +40,18 @@
 
 /* the GPU whose driver the hooks serve (set by the kext once its driver attached the device) */
 static void *g_iopci;
+
+/* VM and BO registries are bridge ownership boundaries: raw client integers never reach amdgpu unchecked. */
+static DEFINE_MUTEX(g_vm_lock);
+struct nmx_accel_bo_record {
+    struct amdgpu_bo *bo;
+    struct amdgpu_device *adev;
+    uint64_t size;
+    struct nmx_accel_bo_record *next;
+};
+static DEFINE_MUTEX(g_bo_lock);
+static struct nmx_accel_bo_record *g_bos;
+static bool nmx_accel_bridge_bo_is_mapped(struct amdgpu_bo *bo);
 
 kern_return_t nmx_xnu_accel_ring_submit(uint32_t ring, uint64_t ib_addr, uint32_t ib_dw,
                                         uint64_t *fence_out);
@@ -129,12 +142,25 @@ int nmx_accel_bridge_alloc(uint64_t size, uint64_t align, uint32_t domain, uint6
         return -ENODEV;
     if (adev->in_suspend || adev->shutdown)
         return -EBUSY;
+
+    struct nmx_accel_bo_record *record = kzalloc(sizeof(*record), GFP_KERNEL);
+    if (record == NULL)
+        return -ENOMEM;
     struct amdgpu_bo *bo = NULL;
     u64 addr = 0;
     void *cpu = NULL;
     int r = amdgpu_bo_create_kernel(adev, size, align != 0 ? (int)align : 4096, domain, &bo, &addr, &cpu);
-    if (r)
+    if (r) {
+        kfree(record);
         return r;
+    }
+    record->bo = bo;
+    record->adev = adev;
+    record->size = amdgpu_bo_size(bo);
+    mutex_lock(&g_bo_lock);
+    record->next = g_bos;
+    g_bos = record;
+    mutex_unlock(&g_bo_lock);
     *bo_out = (uint64_t)(uintptr_t)bo;
     if (gpu_addr_out)
         *gpu_addr_out = addr;
@@ -148,7 +174,13 @@ uint64_t nmx_accel_bridge_dmap(uint64_t bo)
     struct amdgpu_bo *b = (struct amdgpu_bo *)(uintptr_t)bo;
     if (b == NULL)
         return 0;
-    return amdgpu_bo_gpu_offset(b);
+    mutex_lock(&g_bo_lock);
+    struct nmx_accel_bo_record *record = g_bos;
+    while (record != NULL && record->bo != b)
+        record = record->next;
+    uint64_t addr = record != NULL ? amdgpu_bo_gpu_offset(b) : 0;
+    mutex_unlock(&g_bo_lock);
+    return addr;
 }
 
 int nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu)
@@ -156,13 +188,37 @@ int nmx_accel_bridge_free(uint64_t bo, uint64_t gpu_addr, void *cpu)
     struct amdgpu_bo *b = (struct amdgpu_bo *)(uintptr_t)bo;
     if (b == NULL)
         return 0;
-    if (amdgpu_bo_reserve(b, true) != 0)
+    /* Free takes the same outer lock as mapping, so a BO cannot disappear under a VM operation. */
+    mutex_lock(&g_vm_lock);
+    mutex_lock(&g_bo_lock);
+    struct nmx_accel_bo_record **link = &g_bos;
+    while (*link != NULL && (*link)->bo != b)
+        link = &(*link)->next;
+    struct nmx_accel_bo_record *record = *link;
+    if (record == NULL) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -EINVAL;
+    }
+    if (nmx_accel_bridge_bo_is_mapped(b)) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
         return -EBUSY;
+    }
+    if (amdgpu_bo_reserve(b, true) != 0) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -EBUSY;
+    }
+    *link = record->next;
+    mutex_unlock(&g_bo_lock);
+    mutex_unlock(&g_vm_lock);
     /* always: amdgpu_bo_create_kernel kmaps the BO; pinned amdgpu_bo_kunmap is a no-op without a kmap */
     amdgpu_bo_kunmap(b);
     amdgpu_bo_unpin(b);
     amdgpu_bo_unreserve(b);
     amdgpu_bo_unref(&b);
+    kfree(record);
     (void)gpu_addr;
     (void)cpu;
     return 0;
@@ -191,31 +247,106 @@ int nmx_accel_bridge_fence_wait(uint64_t fence, uint32_t timeout_ms)
  * shortcut: no PASID is allocated (the open path's amdgpu_pasid_alloc + amdgpu_vm_set_pasid), so GPU faults cannot be
  * attributed to a task; upgrade with task fault identity. shortcut: release-all frees every record on any port detach,
  * correct while v1 serves one GPU; upgrade by matching records to the detaching device. */
+struct nmx_accel_vm_bo;
+struct nmx_accel_vm_mapping {
+    struct nmx_accel_vm_bo *vm_bo;
+    uint64_t va;
+    uint64_t size;
+    struct nmx_accel_vm_mapping *next;
+};
+struct nmx_accel_vm_bo {
+    struct nmx_accel_bo_record *bo;
+    struct amdgpu_bo_va *bo_va;
+    struct nmx_accel_vm_mapping *mappings;
+    struct nmx_accel_vm_bo *next;
+};
 struct nmx_accel_vm {
     struct amdgpu_device *adev;
     struct amdgpu_vm vm;
     struct nmx_accel_vm *next;
+    struct nmx_accel_vm_bo *bos;
 };
-static DEFINE_MUTEX(g_vm_lock);
 static struct nmx_accel_vm *g_vms;
+
+static int nmx_accel_vm_update(struct nmx_accel_vm *vm, struct nmx_accel_vm_bo *vm_bo,
+                               bool map)
+{
+    int r;
+    if (!amdgpu_vm_ready(&vm->vm))
+        return 0;
+    r = amdgpu_vm_clear_freed(vm->adev, &vm->vm, NULL);
+    if (r)
+        return r;
+    if (map) {
+        r = amdgpu_vm_bo_update(vm->adev, vm_bo->bo_va, false);
+        if (r)
+            return r;
+    }
+    return amdgpu_vm_update_pdes(vm->adev, &vm->vm, false);
+}
+
+static bool nmx_accel_bridge_bo_is_mapped(struct amdgpu_bo *bo)
+{
+    struct nmx_accel_vm *vm;
+    for (vm = g_vms; vm != NULL; vm = vm->next) {
+        struct nmx_accel_vm_bo *vm_bo;
+        for (vm_bo = vm->bos; vm_bo != NULL; vm_bo = vm_bo->next) {
+            if (vm_bo->bo->bo == bo && vm_bo->mappings != NULL)
+                return true;
+        }
+    }
+    return false;
+}
 
 static void nmx_accel_vm_fini(struct nmx_accel_vm *vm)
 {
+    struct drm_exec exec;
+    int r = 0;
+
+    drm_exec_init(&exec, DRM_EXEC_INTERRUPTIBLE_WAIT | DRM_EXEC_IGNORE_DUPLICATES, 0);
+    drm_exec_until_all_locked(&exec) {
+        struct nmx_accel_vm_bo *entry;
+        for (entry = vm->bos; entry != NULL; entry = entry->next) {
+            r = drm_exec_lock_obj(&exec, &entry->bo->bo->tbo.base);
+            drm_exec_retry_on_contention(&exec);
+            if (r)
+                goto out;
+        }
+        r = amdgpu_vm_lock_pd(&vm->vm, &exec, 2);
+        drm_exec_retry_on_contention(&exec);
+        if (r)
+            goto out;
+    }
+    if (r)
+        goto out;
+
+    /* bo_del removes all VM intervals; vm_fini then frees its page tables safely. */
+    while (vm->bos != NULL) {
+        struct nmx_accel_vm_bo *entry = vm->bos;
+        vm->bos = entry->next;
+        amdgpu_vm_bo_del(vm->adev, entry->bo_va);
+        while (entry->mappings != NULL) {
+            struct nmx_accel_vm_mapping *mapping = entry->mappings;
+            entry->mappings = mapping->next;
+            kfree(mapping);
+        }
+        kfree(entry);
+    }
+out:
+    drm_exec_fini(&exec);
     amdgpu_vm_fini(vm->adev, &vm->vm);
     kfree(vm);
 }
 
-/* unlinks the live record whose handle is 'handle'; NULL when there is none (never issued, or already destroyed) */
+/* unlinks the live record whose handle is 'handle' (caller holds g_vm_lock); NULL when there is none */
 static struct nmx_accel_vm *nmx_accel_vm_unlink(uint64_t handle)
 {
-    mutex_lock(&g_vm_lock);
     struct nmx_accel_vm **link = &g_vms;
     while (*link != NULL && (uint64_t)(uintptr_t)*link != handle)
         link = &(*link)->next;
     struct nmx_accel_vm *vm = *link;
     if (vm != NULL)
         *link = vm->next;
-    mutex_unlock(&g_vm_lock);
     return vm;
 }
 
@@ -251,25 +382,31 @@ int nmx_accel_bridge_vm_create(uint64_t *vm_out)
 /* no device gate: teardown must still release the VM while the device shuts down */
 int nmx_accel_bridge_vm_destroy(uint64_t vm)
 {
+    /* the VM's bo_va entries are torn down under g_bo_lock, so a concurrent free sees the BO still mapped or gone */
+    mutex_lock(&g_vm_lock);
+    mutex_lock(&g_bo_lock);
     struct nmx_accel_vm *rec = nmx_accel_vm_unlink(vm);
-    if (rec == NULL)
-        return -EINVAL;
-    nmx_accel_vm_fini(rec);
-    return 0;
+    if (rec != NULL)
+        nmx_accel_vm_fini(rec);
+    mutex_unlock(&g_bo_lock);
+    mutex_unlock(&g_vm_lock);
+    return rec != NULL ? 0 : -EINVAL;
 }
 
 /* port detach, before the driver detaches: every record is released while its amdgpu_device is still live */
 void nmx_accel_bridge_vm_release_all(void)
 {
     mutex_lock(&g_vm_lock);
+    mutex_lock(&g_bo_lock);
     struct nmx_accel_vm *vms = g_vms;
     g_vms = NULL;
-    mutex_unlock(&g_vm_lock);
     while (vms != NULL) {
         struct nmx_accel_vm *next = vms->next;
         nmx_accel_vm_fini(vms);
         vms = next;
     }
+    mutex_unlock(&g_bo_lock);
+    mutex_unlock(&g_vm_lock);
 }
 
 /* device gates shared by map/unmap, in the order the client path requires (no amdgpu call) */
@@ -301,35 +438,216 @@ static int nmx_accel_bridge_vm_check_range(struct amdgpu_device *adev, uint64_t 
     return 0;
 }
 
-/* shortcut: no bo_va record exists, so a valid request returns -ENOTSUP; upgrade with a bridge-owned bo_va table (amdgpu_vm_bo_add,
- * amdgpu_vm_bo_map under drm_exec PD locking) that also checks offset + size against the BO size */
-int nmx_accel_bridge_vm_map(uint64_t vm, uint64_t bo, uint64_t va, uint64_t offset, uint64_t size, uint64_t flags)
+static struct nmx_accel_vm *nmx_accel_vm_find_locked(uint64_t handle)
 {
-    (void)flags;
+    struct nmx_accel_vm *vm;
+    for (vm = g_vms; vm != NULL; vm = vm->next) {
+        if ((uint64_t)(uintptr_t)vm == handle)
+            return vm;
+    }
+    return NULL;
+}
+
+static struct nmx_accel_bo_record *nmx_accel_bo_find_locked(uint64_t handle)
+{
+    struct amdgpu_bo *bo = (struct amdgpu_bo *)(uintptr_t)handle;
+    struct nmx_accel_bo_record *record;
+    for (record = g_bos; record != NULL; record = record->next) {
+        if (record->bo == bo)
+            return record;
+    }
+    return NULL;
+}
+
+static struct nmx_accel_vm_bo *nmx_accel_vm_bo_find_locked(struct nmx_accel_vm *vm,
+                                                            struct nmx_accel_bo_record *bo)
+{
+    struct nmx_accel_vm_bo *entry;
+    for (entry = vm->bos; entry != NULL; entry = entry->next) {
+        if (entry->bo == bo)
+            return entry;
+    }
+    return NULL;
+}
+
+static struct nmx_accel_vm_mapping *nmx_accel_vm_mapping_find_locked(struct nmx_accel_vm_bo *vm_bo,
+                                                                       uint64_t va,
+                                                                       uint64_t size)
+{
+    struct nmx_accel_vm_mapping *mapping;
+    for (mapping = vm_bo->mappings; mapping != NULL; mapping = mapping->next) {
+        if (mapping->va == va && mapping->size == size)
+            return mapping;
+    }
+    return NULL;
+}
+
+static int nmx_accel_bridge_vm_lock(struct nmx_accel_vm *vm, struct nmx_accel_bo_record *bo,
+                                    struct drm_exec *exec)
+{
+    int r;
+    drm_exec_init(exec, DRM_EXEC_INTERRUPTIBLE_WAIT | DRM_EXEC_IGNORE_DUPLICATES, 0);
+    drm_exec_until_all_locked(exec) {
+        r = drm_exec_lock_obj(exec, &bo->bo->tbo.base);
+        drm_exec_retry_on_contention(exec);
+        if (r)
+            return r;
+        r = amdgpu_vm_lock_pd(&vm->vm, exec, 2);
+        drm_exec_retry_on_contention(exec);
+        if (r)
+            return r;
+    }
+    return 0;
+}
+
+int nmx_accel_bridge_vm_map(uint64_t vm_handle, uint64_t bo_handle, uint64_t va,
+                            uint64_t offset, uint64_t size, uint64_t flags)
+{
     struct amdgpu_device *adev = NULL;
+    struct nmx_accel_vm *vm;
+    struct nmx_accel_bo_record *bo;
+    struct nmx_accel_vm_bo *vm_bo;
+    struct nmx_accel_vm_mapping *mapping;
+    struct drm_exec exec;
+    bool added = false;
     int r = nmx_accel_bridge_vm_gate(&adev);
     if (r)
         return r;
-    if (vm == 0 || bo == 0)
+    if (vm_handle == 0 || bo_handle == 0)
         return -EINVAL;
     r = nmx_accel_bridge_vm_check_range(adev, va, offset, size);
     if (r)
         return r;
-    return -ENOTSUP;
+
+    mutex_lock(&g_vm_lock);
+    vm = nmx_accel_vm_find_locked(vm_handle);
+    if (vm == NULL || vm->adev != adev) {
+        mutex_unlock(&g_vm_lock);
+        return -EINVAL;
+    }
+    mutex_lock(&g_bo_lock);
+    bo = nmx_accel_bo_find_locked(bo_handle);
+    if (bo == NULL || bo->adev != adev || offset > bo->size || size > bo->size - offset) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -EINVAL;
+    }
+    mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+    if (mapping == NULL) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -ENOMEM;
+    }
+    r = nmx_accel_bridge_vm_lock(vm, bo, &exec);
+    if (r) {
+        drm_exec_fini(&exec);
+        goto map_out;
+    }
+    vm_bo = nmx_accel_vm_bo_find_locked(vm, bo);
+    if (vm_bo == NULL) {
+        vm_bo = kzalloc(sizeof(*vm_bo), GFP_KERNEL);
+        if (vm_bo == NULL) {
+            r = -ENOMEM;
+            goto map_unlock;
+        }
+        vm_bo->bo = bo;
+        vm_bo->bo_va = amdgpu_vm_bo_add(adev, &vm->vm, bo->bo);
+        if (vm_bo->bo_va == NULL) {
+            kfree(vm_bo);
+            r = -ENOMEM;
+            goto map_unlock;
+        }
+        added = true;
+    }
+    r = amdgpu_vm_bo_map(adev, vm_bo->bo_va, va, offset, size, flags);
+    if (r)
+        goto map_remove;
+    r = nmx_accel_vm_update(vm, vm_bo, true);
+    if (r)
+        goto map_unmap;
+    mapping->vm_bo = vm_bo;
+    mapping->va = va;
+    mapping->size = size;
+    mapping->next = vm_bo->mappings;
+    vm_bo->mappings = mapping;
+    mapping = NULL;
+    if (added) {
+        vm_bo->next = vm->bos;
+        vm->bos = vm_bo;
+    }
+    goto map_unlock;
+map_unmap:
+    amdgpu_vm_bo_unmap(adev, vm_bo->bo_va, va);
+    nmx_accel_vm_update(vm, vm_bo, false);
+map_remove:
+    if (added) {
+        amdgpu_vm_bo_del(adev, vm_bo->bo_va);
+        kfree(vm_bo);
+    }
+map_unlock:
+    drm_exec_fini(&exec);
+map_out:
+    kfree(mapping);
+    mutex_unlock(&g_bo_lock);
+    mutex_unlock(&g_vm_lock);
+    return r;
 }
 
-int nmx_accel_bridge_vm_unmap(uint64_t vm, uint64_t bo, uint64_t va, uint64_t size)
+int nmx_accel_bridge_vm_unmap(uint64_t vm_handle, uint64_t bo_handle, uint64_t va, uint64_t size)
 {
     struct amdgpu_device *adev = NULL;
+    struct nmx_accel_vm *vm;
+    struct nmx_accel_bo_record *bo;
+    struct nmx_accel_vm_bo *vm_bo;
+    struct nmx_accel_vm_mapping *mapping;
+    struct nmx_accel_vm_mapping **link;
+    struct drm_exec exec;
     int r = nmx_accel_bridge_vm_gate(&adev);
     if (r)
         return r;
-    if (vm == 0 || bo == 0)
+    if (vm_handle == 0 || bo_handle == 0)
         return -EINVAL;
     r = nmx_accel_bridge_vm_check_range(adev, va, 0, size);
     if (r)
         return r;
-    return -ENOTSUP;
+
+    mutex_lock(&g_vm_lock);
+    vm = nmx_accel_vm_find_locked(vm_handle);
+    if (vm == NULL || vm->adev != adev) {
+        mutex_unlock(&g_vm_lock);
+        return -EINVAL;
+    }
+    mutex_lock(&g_bo_lock);
+    bo = nmx_accel_bo_find_locked(bo_handle);
+    vm_bo = bo != NULL ? nmx_accel_vm_bo_find_locked(vm, bo) : NULL;
+    mapping = vm_bo != NULL ? nmx_accel_vm_mapping_find_locked(vm_bo, va, size) : NULL;
+    if (bo == NULL || bo->adev != adev || vm_bo == NULL || mapping == NULL) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -ENOENT;
+    }
+    r = nmx_accel_bridge_vm_lock(vm, bo, &exec);
+    if (r) {
+        drm_exec_fini(&exec);
+        goto unmap_out;
+    }
+    r = amdgpu_vm_bo_unmap(adev, vm_bo->bo_va, va);
+    if (r)
+        goto unmap_unlock;
+    r = nmx_accel_vm_update(vm, vm_bo, false);
+    if (r)
+        goto unmap_unlock;
+    link = &vm_bo->mappings;
+    while (*link != mapping)
+        link = &(*link)->next;
+    *link = mapping->next;
+    kfree(mapping);
+unmap_unlock:
+    drm_exec_fini(&exec);
+unmap_out:
+    mutex_unlock(&g_bo_lock);
+    mutex_unlock(&g_vm_lock);
+    return r;
 }
 
 /*
@@ -337,8 +655,8 @@ int nmx_accel_bridge_vm_unmap(uint64_t vm, uint64_t bo, uint64_t va, uint64_t si
  * shape checks run before any amdgpu call: device gates, VM handle, ring bounds, dword-aligned IB with a non-zero
  * length whose end does not overflow. A shape-valid IB is refused: no task VM, bo_va mapping, scheduler entity, or
  * job lifetime is verified, so the IB cannot be proven mapped in that VM and no job or fence is ever produced.
- * shortcut: no task VM/entity/job lifetime and no mapped-range record exist, so every valid request returns -ENOTSUP;
- * upgrade once the task lifetime hook, bo_va table, and drm_sched entity ownership are verified (accel-vm-gate report). */
+ * shortcut: no drm_sched entity or job lifetime exists yet, so every valid request returns -ENOTSUP; upgrade with a
+ * bridge-owned entity and the IB containment check against the bo_va mapping records (accel-vm-gate report). */
 int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out)
 {
     if (fence_out)
