@@ -4,7 +4,7 @@ nmx_accel_bridge_vm_create calls the pinned amdgpu_vm_init with the KMS open pat
 nmx_accel_bridge_vm_release_all calls amdgpu_vm_fini. This test compiles the real bridge bodies against amdgpu stubs
 that count calls, and proves: device gates refuse before any amdgpu call; the XCP value matches the open path; an
 init failure frees its record; destroy releases exactly the live record; an unknown or repeated handle is refused
-without touching amdgpu; and release-all frees every live record. Map/unmap is still fail-closed (see
+without touching amdgpu; and release-all frees every live record. Map/unmap use the real bo_va path (see
 accel_vm_mapping_test.py).
 """
 import re
@@ -108,6 +108,12 @@ typedef uint64_t u64;
 #define drm_exec_retry_on_contention(exec) ((void)0)
 
 struct drm_exec { int locks; };
+struct drm_gpu_scheduler { int unused; };
+struct amdgpu_sched { struct drm_gpu_scheduler **sched; unsigned num_scheds; };
+struct drm_sched_entity { int unused; };
+struct dma_fence { int unused; };
+struct amdgpu_ib { u64 gpu_addr; unsigned length_dw; };
+struct amdgpu_job { unsigned num_ibs; struct amdgpu_ib ibs[1]; };
 struct amdgpu_xcp_mgr { int unused; };
 struct amdgpu_vm_manager { u64 max_pfn; };
 struct amdgpu_device {
@@ -115,13 +121,14 @@ struct amdgpu_device {
     bool in_suspend;
     bool shutdown;
     struct amdgpu_vm_manager vm_manager;
+    struct amdgpu_sched gpu_sched[1][2];
     struct amdgpu_xcp_mgr *xcp_mgr;
 };
 struct amdgpu_vm { int pasid; };
 struct ttm_bo_stub { int unused; };
 struct amdgpu_bo { u64 size; int kmapped; struct { struct ttm_bo_stub base; } tbo; };
 struct amdgpu_bo_va { struct amdgpu_bo *bo; int maps; };
-static struct amdgpu_device device = { true, false, false, { 1ULL << 20 }, NULL };
+static struct amdgpu_device device = { .accel_working = true, .vm_manager = { 1ULL << 20 } };
 static void *g_iopci = &device;
 struct amdgpu_device *adev_of(void *iopci) { return iopci == &device ? &device : NULL; }
 
@@ -132,6 +139,16 @@ int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t xcp_id
     (void)a; (void)vm; ++vm_init_calls; last_xcp_id = xcp_id; return vm_init_fail;
 }
 void amdgpu_vm_fini(struct amdgpu_device *a, struct amdgpu_vm *vm) { (void)a; (void)vm; ++vm_fini_calls; }
+int drm_sched_entity_init(struct drm_sched_entity *entity, int priority,
+                           struct drm_gpu_scheduler **sched, unsigned num, void *guilty) {
+    (void)entity; (void)priority; (void)sched; (void)num; (void)guilty; return 0;
+}
+int amdgpu_job_alloc(struct amdgpu_device *a, struct amdgpu_vm *vm, struct drm_sched_entity *entity,
+                     void *owner, unsigned num_ibs, struct amdgpu_job **job) {
+    (void)a; (void)vm; (void)entity; (void)owner; (void)num_ibs; (void)job; return -ENOMEM;
+}
+struct dma_fence *amdgpu_job_submit(struct amdgpu_job *job) { (void)job; return NULL; }
+void amdgpu_job_free(struct amdgpu_job *job) { (void)job; }
 struct amdgpu_bo_va *amdgpu_vm_bo_add(struct amdgpu_device *a, struct amdgpu_vm *vm, struct amdgpu_bo *bo) {
     (void)a; (void)vm; struct amdgpu_bo_va *v = calloc(1, sizeof(*v)); v->bo = bo; return v;
 }
@@ -157,7 +174,7 @@ u64 amdgpu_bo_gpu_offset(struct amdgpu_bo *bo) { (void)bo; return 0; }
 '''
 HARNESS += span("/* VM and BO registries are bridge ownership boundaries", "kern_return_t nmx_xnu_accel_ring_submit(")
 HARNESS += span("uint64_t nmx_accel_bridge_dmap(uint64_t bo)", "int nmx_accel_bridge_fence_wait(")
-HARNESS += span("struct nmx_accel_vm_bo;", "/*\n * Client submit (Phase D)")
+HARNESS += span("struct nmx_accel_vm_bo;", "int nmx_accel_bridge_client_submit(")
 HARNESS += r'''
 #define VM_ASSERT_NO_AMDGPU(v, f) assert(vm_init_calls == (v) && vm_fini_calls == (f))
 int main(void) {
@@ -227,6 +244,6 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     source = path / "vm_lifecycle.c"
     source.write_text(HARNESS)
-    subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", str(source),
+    subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-variable", str(source),
                     "-o", str(path / "test")], check=True)
     subprocess.run([str(path / "test")], check=True)

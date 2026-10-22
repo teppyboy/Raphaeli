@@ -132,6 +132,12 @@ typedef uint64_t u64;
 #define kfree(p) free(p)
 
 struct drm_exec { int locks; };
+struct drm_gpu_scheduler { int unused; };
+struct amdgpu_sched { struct drm_gpu_scheduler **sched; unsigned num_scheds; };
+struct drm_sched_entity { int unused; };
+struct dma_fence { int unused; };
+struct amdgpu_ib { u64 gpu_addr; unsigned length_dw; };
+struct amdgpu_job { unsigned num_ibs; struct amdgpu_ib ibs[1]; };
 struct amdgpu_vm_manager { u64 max_pfn; };
 struct amdgpu_xcp_mgr { int unused; };
 struct amdgpu_device {
@@ -140,6 +146,7 @@ struct amdgpu_device {
     bool shutdown;
     struct amdgpu_vm_manager vm_manager;
     struct amdgpu_xcp_mgr *xcp_mgr;
+    struct amdgpu_sched gpu_sched[1][2];
 };
 #define AMDGPU_XCP_NO_PARTITION (~0)
 struct amdgpu_vm { int init; };
@@ -148,7 +155,7 @@ struct ttm_bo_stub { struct drm_gem_obj_stub base; };
 struct amdgpu_bo { u64 size; int kmapped; struct ttm_bo_stub tbo; };
 struct amdgpu_bo_va { struct amdgpu_bo *bo; int maps; };
 
-static struct amdgpu_device device = { true, false, false, { 1ULL << 20 }, NULL };
+static struct amdgpu_device device = { .accel_working = true, .vm_manager = { 1ULL << 20 } };
 static void *g_iopci = &device;
 struct amdgpu_device *adev_of(void *iopci) { return iopci == &device ? &device : NULL; }
 
@@ -208,6 +215,16 @@ int drm_exec_until_all_locked_once;
 
 int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t xcp_id) { (void)a; (void)xcp_id; ++vm_init_calls; vm->init = 1; return 0; }
 void amdgpu_vm_fini(struct amdgpu_device *a, struct amdgpu_vm *vm) { (void)a; (void)vm; ++vm_fini_calls; }
+int drm_sched_entity_init(struct drm_sched_entity *entity, int priority,
+                           struct drm_gpu_scheduler **sched, unsigned num, void *guilty) {
+    (void)entity; (void)priority; (void)sched; (void)num; (void)guilty; return 0;
+}
+int amdgpu_job_alloc(struct amdgpu_device *a, struct amdgpu_vm *vm, struct drm_sched_entity *entity,
+                     void *owner, unsigned num_ibs, struct amdgpu_job **job) {
+    (void)a; (void)vm; (void)entity; (void)owner; (void)num_ibs; (void)job; return -ENOMEM;
+}
+struct dma_fence *amdgpu_job_submit(struct amdgpu_job *job) { (void)job; return NULL; }
+void amdgpu_job_free(struct amdgpu_job *job) { (void)job; }
 int amdgpu_bo_reserve(struct amdgpu_bo *bo, bool no_intr) { (void)bo; (void)no_intr; ++reserve_calls; return fail_reserve; }
 void amdgpu_bo_kunmap(struct amdgpu_bo *bo) { (void)bo; ++kunmap_calls; }
 void amdgpu_bo_unpin(struct amdgpu_bo *bo) { (void)bo; ++unpin_calls; }
@@ -224,7 +241,7 @@ def span(begin, end):
 
 HARNESS += span("/* VM and BO registries are bridge ownership boundaries", "kern_return_t nmx_xnu_accel_ring_submit(")
 HARNESS += span("uint64_t nmx_accel_bridge_dmap(uint64_t bo)", "int nmx_accel_bridge_fence_wait(")
-HARNESS += span("struct nmx_accel_vm_bo;", "/*\n * Client submit (Phase D)")
+HARNESS += span("struct nmx_accel_vm_bo;", "int nmx_accel_bridge_client_submit(")
 HARNESS += r'''
 static void reset_counts(void) {
     lock_depth = lock_takes = lock_drops = 0;
