@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 BRIDGE = (ROOT / "Raphaeli/Override/src/nmx_accel_bridge.c").read_text()
 UC = (ROOT / "Raphaeli/Kernel/nmx_accel_uc.cpp").read_text()
 ACCEL = (ROOT / "Raphaeli/Kernel/nmx_accel.cpp").read_text()
+KERNEL_SOURCES = [path for path in (ROOT / "Raphaeli/Kernel").rglob("*")
+                  if path.suffix in {".c", ".cc", ".cpp", ".cxx"}]
 KEXT = (ROOT / "Raphaeli/Kernel/nmx_kext.cpp").read_text()
 JOB_H = (ROOT / "kpi/drm-kmod/drivers/gpu/drm/amd/amdgpu/amdgpu_job.h").read_text()
 PORT_HEADERS = [
@@ -40,6 +42,10 @@ assert "no job and no VM" in BRIDGE  # keep the safety rationale discoverable in
 ring_wrapper = function_body(ACCEL, "extern \"C\" kern_return_t nmx_xnu_accel_ring_submit(")
 assert ring_wrapper.count("nmx_accel_bridge_submit(") == 1
 assert "nmx_accel_bridge_submit(" not in UC
+# No IOAccel implementation may reach the client bridge until the private command
+# ABI, task VM/job lifetime and a test-mode gate are verified.
+assert all("nmx_accel_bridge_client_submit(" not in source.read_text()
+           for source in KERNEL_SOURCES)
 selftest = function_body(BRIDGE, "int nmx_accel_selftest(")
 assert selftest.count("nmx_xnu_accel_ring_submit(") == 1
 assert "nmx_xnu_accel_ring_submit(0, gpu_addr, 2, &fence)" in selftest

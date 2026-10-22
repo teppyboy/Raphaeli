@@ -1,6 +1,6 @@
 # Accel lane A — VM-aware client submission
 
-Status: **client submission is disabled and fail-closed.** The VM/map bridge records exist, but the former scheduler-job attempt omitted prerequisites required by the pinned AMDGPU submission path. `nmx_accel_bridge_client_submit()` now validates the bridge-owned VM/mapping and returns `-ENOTSUP`; it does not allocate or queue a job. No IOAccel caller reaches it and no client rendering is proven.
+Status: **client submission is disabled and fail-closed.** The VM/map bridge records exist, but the former scheduler-job attempt omitted prerequisites required by the pinned AMDGPU submission path. `nmx_accel_bridge_client_submit()` validates the bridge-owned VM/mapping and returns `-ENOTSUP`; it does not allocate or queue a job. No IOAccel caller reaches it and no client rendering is proven.
 
 ## Pinned-source findings
 
@@ -14,8 +14,9 @@ Status: **client submission is disabled and fail-closed.** The VM/map bridge rec
 
 - `nmx_accel_bridge_submit()` is the kernel selftest path only and keeps the raw `amdgpu_ib_schedule(..., job=NULL, ...)` shape.
 - Client submit checks device state, argument shape, bridge VM identity, and complete mapped-range containment, then returns `-ENOTSUP` before any AMDGPU job API.
-- `RaphaeliMemoryMap` remains fail-closed. Unknown family selectors remain unsupported.
-- Focused submit, VM lifecycle, VM mapping, BO-free, task-lifetime, and VM-gate tests pass for this fail-closed contract. `scripts/rt.sh` passes 81/81. `scripts/build.sh` completed the AMD source gate at 900/900 and built the pinned RADV/libdrm dylibs with the staged 14-file firmware set. `scripts/link.sh out-disp` and absolute-path `kmutil inspect -V tb` returned 0; the user-owned `out-disp` bundle is for inspection only and is warned to be codeless until root:wheel ownership.
+- `RaphaeliMemoryMap` remains fail-closed. Unknown family selectors remain unsupported. A static test guards that no source in `Raphaeli/Kernel` calls the internal client-submit bridge.
+- Focused submit, VM lifecycle, VM mapping, BO-free, task-lifetime, VM-gate and fence tests pass. The fence test exercises successful, timeout/error and refused-selftest mock cases; it is not hardware evidence.
+- `scripts/rt.sh` passes 81/81. `scripts/build.sh` completed the AMD source gate at 900/900 and built the pinned RADV/libdrm dylibs with the staged 14-file firmware set. `scripts/link.sh out-disp` and absolute-path `kmutil inspect -V tb` returned 0; the user-owned `out-disp` bundle is for inspection only and is warned to be codeless until root:wheel ownership.
 - These host tests/builds do not prove usable GPU page tables, fences, RADV hardware rendering, ABI compatibility, or target-hardware safety.
 
 ## Required before re-enabling client jobs
