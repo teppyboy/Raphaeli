@@ -65,6 +65,10 @@ assert create.count("amdgpu_vm_init(") == 1 and "amdgpu_vm_fini(" not in create
 assert "xcp_mgr != NULL ? AMDGPU_XCP_NO_PARTITION : 0" in create
 assert create.index("amdgpu_vm_init(") < create.index("vm->adev = adev;")
 assert "kfree(vm);" in create.split("amdgpu_vm_init(")[1].split("}")[0]
+fini = source_function(SOURCE, "static int nmx_accel_vm_fini(")
+assert "drm_exec_fini(&exec);" in fini and "if (r)\n        return -EBUSY;" in fini
+release_all = source_function(SOURCE, "void nmx_accel_bridge_vm_release_all(")
+assert "attempt < 3" in release_all and "g_vms = NULL" not in release_all
 
 # The lifecycle harness compiles the real VM-registry span (locks, BO record, free, VM create/destroy/release-all,
 # gates, map, unmap) against stubs; the mapping contract (accel_vm_mapping_test.py) checks the map/unmap bodies in it.
@@ -122,6 +126,7 @@ static void *g_iopci = &device;
 struct amdgpu_device *adev_of(void *iopci) { return iopci == &device ? &device : NULL; }
 
 int vm_init_calls, vm_fini_calls, vm_init_fail;
+int vm_lock_fail;
 int32_t last_xcp_id;
 int amdgpu_vm_init(struct amdgpu_device *a, struct amdgpu_vm *vm, int32_t xcp_id) {
     (void)a; (void)vm; ++vm_init_calls; last_xcp_id = xcp_id; return vm_init_fail;
@@ -139,7 +144,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *a, struct amdgpu_bo_va *v, bool cl
 bool amdgpu_vm_ready(struct amdgpu_vm *vm) { (void)vm; return true; }
 int amdgpu_vm_clear_freed(struct amdgpu_device *a, struct amdgpu_vm *vm, void *f) { (void)a; (void)vm; (void)f; return 0; }
 int amdgpu_vm_update_pdes(struct amdgpu_device *a, struct amdgpu_vm *vm, bool immediate) { (void)a; (void)vm; (void)immediate; return 0; }
-int amdgpu_vm_lock_pd(struct amdgpu_vm *vm, struct drm_exec *exec, unsigned int n) { (void)vm; (void)n; exec->locks++; return 0; }
+int amdgpu_vm_lock_pd(struct amdgpu_vm *vm, struct drm_exec *exec, unsigned int n) { (void)vm; (void)n; exec->locks++; return vm_lock_fail ? -EBUSY : 0; }
 int drm_exec_lock_obj(struct drm_exec *exec, void *obj) { (void)obj; exec->locks++; return 0; }
 void drm_exec_init(struct drm_exec *exec, unsigned flags, unsigned n) { (void)flags; (void)n; exec->locks = 0; }
 void drm_exec_fini(struct drm_exec *exec) { (void)exec; }
@@ -200,7 +205,14 @@ int main(void) {
     vm_init_fail = 0;
     VM_ASSERT_NO_AMDGPU(3, 1);
 
-    /* release-all frees every live record (the one left from the first create) and then nothing */
+    /* contention is a failed teardown: fini is called, but the live VM remains registered */
+    vm_lock_fail = 1;
+    assert(nmx_accel_bridge_vm_destroy(first) == -EBUSY);
+    VM_ASSERT_NO_AMDGPU(3, 1);
+    nmx_accel_bridge_vm_release_all();
+    VM_ASSERT_NO_AMDGPU(3, 1);
+    vm_lock_fail = 0;
+    /* release-all retries and frees the retained record, then nothing */
     nmx_accel_bridge_vm_release_all();
     VM_ASSERT_NO_AMDGPU(3, 2);
     assert(nmx_accel_bridge_vm_destroy(first) == -EINVAL);
@@ -215,6 +227,6 @@ with tempfile.TemporaryDirectory() as directory:
     path = Path(directory)
     source = path / "vm_lifecycle.c"
     source.write_text(HARNESS)
-    subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", str(source),
+    subprocess.run(["clang", "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", str(source),
                     "-o", str(path / "test")], check=True)
     subprocess.run([str(path / "test")], check=True)

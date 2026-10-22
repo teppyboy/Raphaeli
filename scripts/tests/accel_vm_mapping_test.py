@@ -55,7 +55,7 @@ check_range = function("nmx_accel_bridge_vm_check_range", "static int")
 free_body = function("nmx_accel_bridge_free")
 destroy_body = function("nmx_accel_bridge_vm_destroy")
 release_body = function("nmx_accel_bridge_vm_release_all", "void")
-fini_body = function("nmx_accel_vm_fini", "static void")
+fini_body = function("nmx_accel_vm_fini", "static int")
 
 # Device gates and range checks run before any registry or amdgpu access.
 assert map_body.index("nmx_accel_bridge_vm_gate(") < map_body.index("nmx_accel_bridge_vm_check_range(")

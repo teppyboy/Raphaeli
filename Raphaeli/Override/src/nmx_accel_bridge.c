@@ -298,7 +298,7 @@ static bool nmx_accel_bridge_bo_is_mapped(struct amdgpu_bo *bo)
     return false;
 }
 
-static void nmx_accel_vm_fini(struct nmx_accel_vm *vm)
+static int nmx_accel_vm_fini(struct nmx_accel_vm *vm)
 {
     struct drm_exec exec;
     int r = 0;
@@ -334,20 +334,11 @@ static void nmx_accel_vm_fini(struct nmx_accel_vm *vm)
     }
 out:
     drm_exec_fini(&exec);
+    if (r)
+        return -EBUSY;
     amdgpu_vm_fini(vm->adev, &vm->vm);
     kfree(vm);
-}
-
-/* unlinks the live record whose handle is 'handle' (caller holds g_vm_lock); NULL when there is none */
-static struct nmx_accel_vm *nmx_accel_vm_unlink(uint64_t handle)
-{
-    struct nmx_accel_vm **link = &g_vms;
-    while (*link != NULL && (uint64_t)(uintptr_t)*link != handle)
-        link = &(*link)->next;
-    struct nmx_accel_vm *vm = *link;
-    if (vm != NULL)
-        *link = vm->next;
-    return vm;
+    return 0;
 }
 
 int nmx_accel_bridge_vm_create(uint64_t *vm_out)
@@ -382,31 +373,57 @@ int nmx_accel_bridge_vm_create(uint64_t *vm_out)
 /* no device gate: teardown must still release the VM while the device shuts down */
 int nmx_accel_bridge_vm_destroy(uint64_t vm)
 {
+    struct nmx_accel_vm **link;
+    struct nmx_accel_vm *rec;
+    struct nmx_accel_vm *next;
+    int r;
+
     /* the VM's bo_va entries are torn down under g_bo_lock, so a concurrent free sees the BO still mapped or gone */
     mutex_lock(&g_vm_lock);
     mutex_lock(&g_bo_lock);
-    struct nmx_accel_vm *rec = nmx_accel_vm_unlink(vm);
-    if (rec != NULL)
-        nmx_accel_vm_fini(rec);
+    link = &g_vms;
+    while (*link != NULL && (uint64_t)(uintptr_t)*link != vm)
+        link = &(*link)->next;
+    rec = *link;
+    if (rec == NULL) {
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        return -EINVAL;
+    }
+    /* fini frees rec on success, so the successor is read first */
+    next = rec->next;
+    r = nmx_accel_vm_fini(rec);
+    if (r == 0)
+        *link = next;
     mutex_unlock(&g_bo_lock);
     mutex_unlock(&g_vm_lock);
-    return rec != NULL ? 0 : -EINVAL;
+    return r;
 }
 
 /* port detach, before the driver detaches: every record is released while its amdgpu_device is still live */
 void nmx_accel_bridge_vm_release_all(void)
 {
-    mutex_lock(&g_vm_lock);
-    mutex_lock(&g_bo_lock);
-    struct nmx_accel_vm *vms = g_vms;
-    g_vms = NULL;
-    while (vms != NULL) {
-        struct nmx_accel_vm *next = vms->next;
-        nmx_accel_vm_fini(vms);
-        vms = next;
+    /* Bounded retries leave contended records registered for a later teardown attempt. */
+    for (int attempt = 0; attempt < 3; attempt++) {
+        bool pending = false;
+        mutex_lock(&g_vm_lock);
+        mutex_lock(&g_bo_lock);
+        struct nmx_accel_vm **link = &g_vms;
+        while (*link != NULL) {
+            struct nmx_accel_vm *vm = *link;
+            struct nmx_accel_vm *next = vm->next;
+            if (nmx_accel_vm_fini(vm) != 0) {
+                pending = true;
+                link = &vm->next;
+            } else {
+                *link = next;
+            }
+        }
+        mutex_unlock(&g_bo_lock);
+        mutex_unlock(&g_vm_lock);
+        if (!pending)
+            break;
     }
-    mutex_unlock(&g_bo_lock);
-    mutex_unlock(&g_vm_lock);
 }
 
 /* device gates shared by map/unmap, in the order the client path requires (no amdgpu call) */
