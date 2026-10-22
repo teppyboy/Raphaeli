@@ -27,4 +27,13 @@ for p in mesa-macos libdrm-macos; do
         echo "kpi-init: applied patches/$p.patch"
     fi
 done
+
+# drm-kmod minor-release guard (drm_minor_alloc_release): kpi/ is pinned upstream + patches; same apply-when-unapplied rule
+p=drm-kmod-minor-release
+if [ -f "$ROOT/patches/$p.patch" ]; then
+    if git -C kpi/drm-kmod apply --check "$ROOT/patches/$p.patch" 2>/dev/null; then
+        git -C kpi/drm-kmod apply "$ROOT/patches/$p.patch"
+        echo "kpi-init: applied patches/$p.patch"
+    fi
+fi
 echo "kpi-init: ok"
