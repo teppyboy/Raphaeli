@@ -668,8 +668,7 @@ unmap_out:
 }
 
 /*
- * Client submit: validate the IB against a bridge-owned VM mapping, then send a real scheduler job. The entity is
- * shared by this bridge and initialized on the first mapped submission against the default gfx scheduler list.
+ * Client submit: validate mapped-range containment, then refuse until per-task VM/job/fence lifetimes exist.
  */
 int nmx_accel_bridge_client_submit(uint64_t vm, uint32_t ring, uint64_t ib_addr, uint32_t ib_dw, uint64_t *fence_out)
 {
